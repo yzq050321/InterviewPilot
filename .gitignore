@@ -1,0 +1,29 @@
+
+# Python 虚拟环境
+.venv/
+
+# Python 缓存
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 环境变量和 API Key
+.env
+.env.*
+!.env.example
+
+# React 前端依赖
+node_modules/
+dist/
+
+# 本地数据库
+*.db
+
+# 本地向量数据库
+chroma_db/
+
+# 编辑器和系统文件
+.vscode/
+.DS_Store
+
+*.sqlite3

@@ -1,0 +1,161 @@
+
+from datetime import datetime
+from sqlalchemy import Column, Integer, JSON
+from sqlalchemy import (
+    String,
+    Text,
+    ForeignKey,
+    DateTime,
+    func
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
+
+
+# 面试表
+class Interview(Base):
+    __tablename__ = "interviews"
+
+    # 主键
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True
+    )
+
+    # 目标岗位
+    position: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False
+    )
+
+    # 面试难度
+    difficulty: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False
+    )
+
+    # 面试状态
+    status: Mapped[str] = mapped_column(
+        String(30),
+        default="in_progress",
+        nullable=False
+    )
+
+    # 创建时间
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False
+    )
+
+    # 一场面试对应多条消息
+    messages: Mapped[list["Message"]] = relationship(
+        back_populates="interview",
+        cascade="all, delete-orphan"
+    )
+
+
+# 消息表
+class Message(Base):
+    __tablename__ = "messages"
+
+    # 主键
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True
+    )
+
+    # 所属面试 ID（外键）
+    interview_id: Mapped[int] = mapped_column(
+        ForeignKey("interviews.id"),
+        nullable=False,
+        index=True
+    )
+
+    # 消息角色：user / assistant
+    role: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False
+    )
+
+    # 消息正文
+    content: Mapped[str] = mapped_column(
+        Text,
+        nullable=False
+    )
+
+    # 消息创建时间
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False
+    )
+
+    # 每条消息属于一场面试
+    interview: Mapped["Interview"] = relationship(
+        back_populates="messages"
+    )
+
+
+class Evaluation(Base):
+    __tablename__ = "evaluations"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    interview_id = Column(
+        Integer,
+        ForeignKey("interviews.id"),
+        nullable=False,
+        unique=True
+    )
+
+    technical_score = Column(
+        Integer,
+        nullable=True
+    )
+
+    completeness_score = Column(
+        Integer,
+        nullable=True
+    )
+
+    clarity_score = Column(
+        Integer,
+        nullable=True
+    )
+
+    overall_score = Column(
+        Integer,
+        nullable=True
+    )
+
+    summary = Column(
+        Text,
+        nullable=False
+    )
+
+    strengths = Column(
+        JSON,
+        nullable=False
+    )
+
+    weaknesses = Column(
+        JSON,
+        nullable=False
+    )
+
+    suggestions = Column(
+        JSON,
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False
+    )
