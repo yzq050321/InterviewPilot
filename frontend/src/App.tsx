@@ -21,10 +21,20 @@ import InterviewChat from "./components/InterviewChat";
 import EvaluationReport from "./components/EvaluationReport";
 import InterviewHistory from "./components/InterviewHistory";
 import InterviewDetail from "./components/InterviewDetail";
+import ReportPage from "./pages/ReportPage";
+import {
+  Link,
+  Route,
+  Routes,
+  useNavigate,
+  useMatch,
+} from "react-router-dom";
 
 function App() {
+  const navigate = useNavigate();
+  const interviewMatch = useMatch("/interview/:id");
+  const routeInterviewId = interviewMatch?.params.id;
   const chatRef = useRef<HTMLElement | null>(null);
-  const [scrollToChat, setScrollToChat] = useState(false);
   const [position, setPosition] = useState("Java后端开发实习生");
   const [difficulty, setDifficulty] = useState("中等");
   const [interviewId, setInterviewId] = useState<number | null>(null);
@@ -41,9 +51,6 @@ function App() {
   const [selectedInterview, setSelectedInterview] = useState<InterviewDetailType | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
-  const [historyEvaluation, setHistoryEvaluation] = useState<Evaluation | null>(null);
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportError, setReportError] = useState("");
   const submittingRef = useRef(false);
 
 
@@ -67,6 +74,7 @@ function App() {
       );
 
       setInterviewId(data.interview_id);
+      navigate(`/interview/${data.interview_id}`);
 
       setMessages([
         {
@@ -201,6 +209,9 @@ function App() {
       // 保留原来的评估报告生成逻辑
       await generateReport(interviewId);
 
+      // 报告生成成功后，跳转到独立报告页面
+      navigate(`/report/${interviewId}`);
+
       // 刷新历史面试记录
       void fetchInterviewHistory();
     } catch (err) {
@@ -261,8 +272,6 @@ function App() {
     setDetailLoading(true);
     setDetailError("");
     setSelectedInterview(null);
-    setHistoryEvaluation(null);
-    setReportError("");
 
     try {
       const data: InterviewDetailType =
@@ -314,10 +323,10 @@ function App() {
 
       // 关闭历史详情
       setSelectedInterview(null);
-      setHistoryEvaluation(null);
 
-      // 返回面试区域
-      setScrollToChat(true);
+
+      // 恢复面试后进入对应的聊天页面
+      navigate(`/interview/${id}`);
 
     } catch (err) {
       setDetailError(
@@ -329,158 +338,216 @@ function App() {
   }
 
 
-  async function loadHistoryEvaluation(interviewId: number) {
-    setReportLoading(true);
-    setReportError("");
-    setHistoryEvaluation(null);
-
-    try {
-      const data: Evaluation =
-        await getInterviewEvaluation(interviewId);
-
-      setHistoryEvaluation(data);
-    } catch (err) {
-      setReportError(
-        err instanceof Error
-          ? err.message
-          : "获取评估报告失败"
-      );
-    } finally {
-      setReportLoading(false);
-    }
-  }
 
   useEffect(() => {
     void fetchInterviewHistory();
   }, []);
 
+
   useEffect(() => {
-    if (!scrollToChat || interviewId === null) return;
+    if (!routeInterviewId) return;
 
-    chatRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    const id = Number(routeInterviewId);
 
-    setScrollToChat(false);
-  }, [scrollToChat, interviewId]);
+    // 检查 URL 中的 ID 是否有效
+    if (!Number.isInteger(id) || id <= 0) {
+      setError("无效的面试 ID");
+      return;
+    }
+
+    // 当前面试已加载，不需要重复请求
+    if (interviewId === id) return;
+
+    let cancelled = false;
+
+    async function restoreFromUrl() {
+      setDetailLoading(true);
+      setError("");
+
+      try {
+        const data = await getInterviewDetail(id);
+
+        if (cancelled) return;
+
+        setInterviewId(data.interview_id);
+        setPosition(data.position);
+        setDifficulty(data.difficulty);
+
+        setMessages(
+          data.messages.map((message) => ({
+            role: message.role === "user" ? "user" : "assistant",
+            content: message.content,
+          }))
+        );
+
+
+        setAnswer("");
+        setCompleted(data.status !== "in_progress");
+
+        // 如果面试已经结束，尝试恢复之前生成的评估报告
+        setEvaluation(null);
+
+        if (data.status !== "in_progress") {
+          try {
+            const report = await getInterviewEvaluation(id);
+
+            if (cancelled) return;
+
+            setEvaluation(report);
+          } catch (err) {
+            if (cancelled) return;
+
+            setError(
+              err instanceof Error
+                ? `面试记录已恢复，但评估报告加载失败：${err.message}`
+                : "面试记录已恢复，但评估报告加载失败"
+            );
+          }
+        }
+      } catch (err) {
+        if (cancelled) return;
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "加载面试失败"
+        );
+      } finally {
+        if (!cancelled) {
+          setDetailLoading(false);
+        }
+      }
+    }
+
+    void restoreFromUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [routeInterviewId, interviewId]);
+
 
   return (
     <div className="app">
+
       <header className="navbar">
         <div className="brand">
           <div className="brand-icon">✦</div>
           <span>InterviewPilot</span>
         </div>
 
-        <span className="nav-description">
-          AI 智能模拟面试平台
-        </span>
+        <nav className="nav-links">
+          <Link to="/">首页</Link>
+
+          {interviewId !== null && (
+            <Link to={`/interview/${interviewId}`}>
+              当前面试
+            </Link>
+          )}
+          <Link to="/history">历史记录</Link>
+        </nav>
       </header>
 
       <main className="main-content">
-        <section className="hero">
-          <div className="hero-badge">
-            ✦ AI POWERED INTERVIEW
-          </div>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <>
+                <section className="hero">
+                  <div className="hero-badge">✦ AI POWERED INTERVIEW</div>
+                  <h1>
+                    让每一次练习，
+                    <span>都更接近理想 Offer</span>
+                  </h1>
+                  <p>智能生成面试题 · 实时深度追问 · 多维能力评估</p>
+                </section>
 
-          <h1>
-            让每一次练习，
-            <span>都更接近理想 Offer</span>
-          </h1>
-
-          <p>
-            智能生成面试题 · 实时深度追问 · 多维能力评估
-          </p>
-        </section>
-
-
-        <InterviewForm
-          position={position}
-          difficulty={difficulty}
-          loading={loading}
-          interviewId={interviewId}
-          onPositionChange={setPosition}
-          onDifficultyChange={setDifficulty}
-          onStartInterview={startInterview}
-        />
-
-
-        {interviewId !== null && (
-          <InterviewChat
-            interviewId={interviewId}
-            position={position}
-            difficulty={difficulty}
-            messages={messages}
-            answer={answer}
-            loading={loading}
-            finishing={finishing}
-            completed={completed}
-            hasEvaluation={evaluation !== null}
-            chatRef={chatRef}
-            onAnswerChange={setAnswer}
-            onSubmitAnswer={submitAnswer}
-            onFinishInterview={finishInterview}
-            onRetryReport={retryGenerateReport}
+                <InterviewForm
+                  position={position}
+                  difficulty={difficulty}
+                  loading={loading}
+                  interviewId={interviewId}
+                  onPositionChange={setPosition}
+                  onDifficultyChange={setDifficulty}
+                  onStartInterview={startInterview}
+                />
+                {error && <p className="error" role="alert">{error}</p>}
+              </>
+            }
           />
-        )}
 
-
-        {evaluation && (
-          <EvaluationReport evaluation={evaluation} />
-        )}
-
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-
-
-
-        <InterviewHistory
-          interviewHistory={interviewHistory}
-          historyLoading={historyLoading}
-          historyError={historyError}
-          onSelectInterview={loadInterviewDetail}
-        />
-        {detailLoading && (
-          <p className="history-message">
-            正在加载面试详情...
-          </p>
-        )}
-
-        {detailError && (
-          <p className="error" role="alert">
-            {detailError}
-          </p>
-        )}
-
-
-        {selectedInterview && (
-          <InterviewDetail
-            interview={selectedInterview}
-            detailLoading={detailLoading}
-            loading={loading}
-            finishing={finishing}
-            reportLoading={reportLoading}
-            onResumeInterview={resumeInterview}
-            onLoadEvaluation={loadHistoryEvaluation}
+          <Route
+            path="/interview/:id"
+            element={
+              <>
+                {interviewId !== null ? (
+                  <>
+                    <InterviewChat
+                      interviewId={interviewId}
+                      position={position}
+                      difficulty={difficulty}
+                      messages={messages}
+                      answer={answer}
+                      loading={loading}
+                      finishing={finishing}
+                      completed={completed}
+                      hasEvaluation={evaluation !== null}
+                      chatRef={chatRef}
+                      onAnswerChange={setAnswer}
+                      onSubmitAnswer={submitAnswer}
+                      onFinishInterview={finishInterview}
+                      onRetryReport={retryGenerateReport}
+                    />
+                    {evaluation && <EvaluationReport evaluation={evaluation} />}
+                  </>
+                ) : (
+                  <p className="history-message">
+                    尚未加载面试，请返回首页创建面试，或从历史记录恢复面试。
+                  </p>
+                )}
+                {error && <p className="error" role="alert">{error}</p>}
+              </>
+            }
           />
-        )}
 
-        {reportError && (
-          <p className="error" role="alert">
-            {reportError}
-          </p>
-        )}
+          <Route
+            path="/history"
+            element={
+              <>
+                <InterviewHistory
+                  interviewHistory={interviewHistory}
+                  historyLoading={historyLoading}
+                  historyError={historyError}
+                  onSelectInterview={loadInterviewDetail}
+                />
+                {detailLoading && (
+                  <p className="history-message">正在加载面试详情...</p>
+                )}
+                {detailError && (
+                  <p className="error" role="alert">{detailError}</p>
+                )}
+                {selectedInterview && (
 
-        {historyEvaluation && (
-          <EvaluationReport
-            evaluation={historyEvaluation}
-            isHistory
+                  <InterviewDetail
+                    interview={selectedInterview}
+                    detailLoading={detailLoading}
+                    loading={loading}
+                    finishing={finishing}
+                    onResumeInterview={resumeInterview}
+                    onLoadEvaluation={(id) => navigate(`/report/${id}`)}
+                  />
+                )}
+                
+              </>
+            }
           />
-        )}
+
+          <Route
+            path="/report/:id"
+            element={<ReportPage />}
+          />
+        </Routes>
       </main>
     </div>
   );

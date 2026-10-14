@@ -8,7 +8,6 @@ type InterviewDetailProps = {
   detailLoading: boolean;
   loading: boolean;
   finishing: boolean;
-  reportLoading: boolean;
   onResumeInterview: (interviewId: number) => void;
   onLoadEvaluation: (interviewId: number) => void;
 };
@@ -18,7 +17,6 @@ export default function InterviewDetail({
   detailLoading,
   loading,
   finishing,
-  reportLoading,
   onResumeInterview,
   onLoadEvaluation,
 }: InterviewDetailProps) {
@@ -97,17 +95,15 @@ export default function InterviewDetail({
 
       {interview.status === "completed" && (
         <div className="answer-area">
+
           <button
             type="button"
             className="start-button"
             onClick={() =>
               onLoadEvaluation(interview.interview_id)
             }
-            disabled={reportLoading}
           >
-            {reportLoading
-              ? "正在加载 AI 评估报告..."
-              : "查看历史 AI 评估报告 →"}
+            查看历史 AI 评估报告 →
           </button>
         </div>
       )}

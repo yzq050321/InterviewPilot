@@ -5,7 +5,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from app.services.llm_service import llm
+from app.services.model_client import llm
 
 
 class EvaluationReport(BaseModel):

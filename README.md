@@ -13,6 +13,18 @@ InterviewPilot 是一个基于大语言模型的 AI 模拟面试 Web 应用，�
 * **AI 面试评估**：面试结束后生成评估报告。
 * **面试历史管理**：支持查看历史记录、恢复未结束的面试。
 
+### 多页面交互
+
+前端使用 React、TypeScript 和 React Router，将面试创建、AI 问答、历史记录和评估报告拆分为独立页面。
+
+* **首页：** 选择岗位和难度，创建模拟面试。
+* **模拟面试页：** 展示完整对话，支持提交回答、AI 动态追问以及结束面试。
+* **历史记录页：** 查看历史面试详情，恢复未完成的面试，或跳转至评估报告。
+* **评估报告页：** 查看已生成的 AI 面试评分和改进建议。
+
+面试页和报告页支持通过 URL 直接访问及刷新恢复。前端根据面试 ID 调用 FastAPI 接口，从 MySQL 中读取已保存的数据。
+
+
 ## 技术栈
 
 | 分类        | 技术                      |
@@ -24,7 +36,7 @@ InterviewPilot 是一个基于大语言模型的 AI 模拟面试 Web 应用，�
 | Embedding | 阿里云百炼 Qwen-Embedding    |
 | 向量数据库     | Chroma                  |
 | 关系型数据库    | MySQL、SQLAlchemy        |
-| 前端        | React、TypeScript、Vite   |
+| 前端        | React + TypeScript + Vite + React Router   |
 | 基础测试      | pytest                  |
 
 ## 系统架构
@@ -61,6 +73,9 @@ Qwen-Embedding + Chroma
 3. 调用 Qwen-Embedding 将文本转换为向量。
 4. 将知识片段和向量存储到 Chroma。
 5. 根据面试任务检索相关知识，为 AI 面试官提供参考。
+(目前知识库主要收录 Python 后端开发相关技术内容，包括 Python、FastAPI、MySQL 和异步编程等知识。当前使用小规模 Markdown 文档验证 RAG 检索流程，后续计划扩展更多岗位知识。)
+
+
 
 ## Agent 工作流程
 
@@ -112,7 +127,7 @@ http://127.0.0.1:8000/docs
 ### 2. 启动前端
 
 ```bash
-cd frontend
+cd ../frontend
 npm install
 npm run dev
 ```
@@ -123,13 +138,30 @@ http://localhost:5173/
 
 ## 项目展示
 
-### AI 模拟面试
+### 1. 首页 — 创建模拟面试
+
+选择目标岗位和面试难度，创建新的 AI 模拟面试。
+
+![创建模拟面试](docs/home-demo.png)
+
+### 2. AI 模拟面试
+
+AI 面试官根据岗位和难度生成问题，并结合历史回答继续追问。
 
 ![AI 模拟面试](docs/interview-demo.png)
 
-### AI 面试评估
+### 3. 历史面试管理
+
+查看历史面试记录，支持恢复未完成的面试，以及跳转查看已完成面试的评估报告。
+
+![历史面试记录](docs/history-demo.png)
+
+### 4. AI 面试评估报告
+
+面试结束后生成评估报告，展示评分和改进建议。
 
 ![AI 面试评估](docs/evaluation-demo.png)
+
 
 ## 后续优化
 
