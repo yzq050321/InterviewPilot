@@ -17,6 +17,11 @@ from app.database import Base
 class Interview(Base):
     __tablename__ = "interviews"
 
+    # V2：来源招聘任务，旧版面试允许为空
+    job_id: Mapped[int | None] = mapped_column(
+        ForeignKey("job_postings.id"), nullable=True, index=True
+    )
+
     # 主键
     id: Mapped[int] = mapped_column(
         primary_key=True,

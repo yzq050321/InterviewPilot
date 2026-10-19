@@ -40,11 +40,15 @@ from app.login_limiter import (
     cleanup_expired_records,
 )
 
+from app.job_routes import router as job_router
+
 # 创建 FastAPI 应用
 app = FastAPI(
     title="InterviewPilot API",
     version="1.0.0"
 )
+
+app.include_router(job_router)
 
 candidate_bearer = HTTPBearer(auto_error=False)
 
