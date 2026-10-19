@@ -17,6 +17,9 @@ import InterviewChat from "./components/InterviewChat";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminInterviewDetailPage from "./pages/AdminInterviewDetailPage";
+import AdminJobsPage from "./pages/AdminJobsPage";
+import JobInvitationPage from "./pages/JobInvitationPage";
+import type { InvitedInterview, Difficulty } from "./services/jobApi";
 import {
   Link,
   Route,
@@ -32,6 +35,7 @@ function App() {
   const chatRef = useRef<HTMLElement | null>(null);
   const [candidateName, setCandidateName] = useState("");
   const [position, setPosition] = useState("Java后端开发实习生");
+  const [difficulty, setDifficulty] = useState<Difficulty>("中等");
   const [interviewId, setInterviewId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [answer, setAnswer] = useState("");
@@ -75,6 +79,7 @@ function App() {
         data.interview_token
       );
       setInterviewId(data.interview_id);
+      setDifficulty("中等");
       navigate(`/interview/${data.interview_id}`);
 
       setMessages([
@@ -95,6 +100,21 @@ function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // 邀请面试复用现有候选人 Token、问答及完成报告流程。
+  function handleInvitationStarted(data: InvitedInterview) {
+    sessionStorage.setItem(`interview_token_${data.interview_id}`, data.interview_token);
+    setCandidateName(data.candidate_name);
+    setPosition(data.position);
+    setDifficulty(data.difficulty);
+    setInterviewId(data.interview_id);
+    setMessages([{ role: "assistant", content: data.question }]);
+    setAnswer("");
+    setError("");
+    setCompleted(false);
+    setEvaluation(null);
+    navigate(`/interview/${data.interview_id}`);
   }
 
   // 提交回答，获取 AI 追问
@@ -266,6 +286,7 @@ function App() {
 
         setInterviewId(data.interview_id);
         setPosition(data.position);
+        setDifficulty(data.difficulty as Difficulty);
 
         setMessages(
           data.messages.map((message) => ({
@@ -340,6 +361,9 @@ function App() {
             element={<AdminDashboardPage />}
           />
 
+          <Route path="/admin/jobs" element={<AdminJobsPage />} />
+          <Route path="/invite/:inviteCode" element={<JobInvitationPage onStarted={handleInvitationStarted} />} />
+
           <Route
             path="/admin/interviews/:id"
             element={<AdminInterviewDetailPage />}
@@ -381,7 +405,7 @@ function App() {
                     <InterviewChat
                       interviewId={interviewId}
                       position={position}
-                      difficulty="中等"
+                      difficulty={difficulty}
                       messages={messages}
                       answer={answer}
                       loading={loading}

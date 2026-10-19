@@ -114,6 +114,15 @@ export default function AdminDashboardPage() {
                 </div>
 
 
+                <div className="jobs-dashboard-entry">
+                    <div>
+                        <strong>招聘任务与面试邀请</strong>
+                        <p>创建招聘岗位、复制邀请链接，让候选人进入指定岗位的 AI 面试。</p>
+                    </div>
+                    <button type="button" className="admin-detail-button"
+                        onClick={() => navigate("/admin/jobs")}>管理招聘任务 →</button>
+                </div>
+
                 <button
                     type="button"
                     className="admin-logout-button"

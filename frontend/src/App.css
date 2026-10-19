@@ -1294,3 +1294,64 @@
     flex-direction: column;
   }
 }
+/* V2 HR 招聘任务与候选人邀请入口 */
+.jobs-dashboard-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+  margin-bottom: 24px;
+  border-radius: 16px;
+  border: 1px solid #dedcff;
+  background: #f7f6ff;
+}
+.jobs-dashboard-entry strong { color: #302667; font-size: 16px; }
+.jobs-dashboard-entry p { margin: 6px 0 0; color: #64748b; font-size: 13px; }
+.jobs-dashboard-entry button { flex-shrink: 0; }
+.jobs-page { max-width: 880px; }
+.jobs-heading, .jobs-item-top, .jobs-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.jobs-heading { border-bottom: 1px solid #e8ecf5; padding-bottom: 20px; margin-bottom: 26px; }
+.jobs-heading h2 { color: #1e293b; margin: 0 0 8px; }
+.jobs-subtitle, .jobs-hint { color: #64748b; font-size: 13px; line-height: 1.7; }
+.jobs-back { color: #4f46e5; font-size: 14px; white-space: nowrap; }
+.jobs-form { background: #f8faff; border: 1px solid #e8ecf5; border-radius: 16px; padding: 22px; }
+.jobs-form h3, .jobs-list h3 { color: #25304a; margin: 0 0 20px; }
+.jobs-form .form-group { margin-bottom: 18px; }
+.jobs-form textarea, .jobs-form select {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  padding: 13px 15px;
+  background: #fff;
+  border: 1px solid #dbe3f2;
+  border-radius: 10px;
+  color: #334155;
+}
+.jobs-form textarea { resize: vertical; line-height: 1.7; }
+.jobs-notice { padding: 12px 14px; border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; border-radius: 10px; font-size: 14px; }
+.jobs-list { margin-top: 36px; }
+.jobs-item { border: 1px solid #e8ecf5; border-radius: 16px; padding: 20px; margin: 14px 0; background: #fff; }
+.jobs-item h4 { margin: 0 0 7px; color: #1e293b; }
+.jobs-item-top p { margin: 0; color: #64748b; font-size: 13px; }
+.jobs-tag { font-size: 12px; color: #64748b; background: #f1f5f9; padding: 7px 12px; border-radius: 20px; white-space: nowrap; }
+.jobs-tag.active { color: #047857; background: #d1fae5; }
+.jobs-requirements, .invite-requirements { color: #475569; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.jobs-url { margin: 15px 0; padding: 12px; border-radius: 10px; background: #f8fafc; color: #4f46e5; font-size: 12px; word-break: break-all; user-select: all; }
+.jobs-actions { justify-content: flex-start; flex-wrap: wrap; }
+.jobs-actions button { padding: 10px 15px; border-radius: 10px; cursor: pointer; font-weight: 600; }
+.jobs-actions button:disabled { cursor: not-allowed; opacity: 0.5; }
+.jobs-stop { border: 1px solid #fecaca; background: #fff; color: #b91c1c; }
+.invite-job-info { background: #f8faff; border-radius: 14px; border: 1px solid #e8ecf5; padding: 20px; margin-bottom: 26px; }
+.invite-job-info h3 { margin: 0 0 15px; color: #1e293b; }
+.invite-job-info p { margin: 10px 0; color: #475569; font-size: 14px; }
+@media (max-width: 650px) {
+  .jobs-heading, .jobs-dashboard-entry, .jobs-item-top { flex-direction: column; align-items: flex-start; }
+  .jobs-form { padding: 16px; }
+  .jobs-page { padding: 20px; }
+}
