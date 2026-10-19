@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS job_postings (
   title VARCHAR(100) NOT NULL,
   position VARCHAR(100) NOT NULL,
   requirements TEXT NOT NULL,
-  difficulty VARCHAR(30) NOT NULL DEFAULT '中等',
+  difficulty VARCHAR(30) NOT NULL,
   invite_code VARCHAR(64) NOT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
