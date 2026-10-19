@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.services.model_client import llm
+from app.services.agent_service import _format_job_requirements
 
 
 class EvaluationReport(BaseModel):
@@ -36,7 +37,8 @@ class EvaluationReport(BaseModel):
 def generate_evaluation(
     position: str,
     difficulty: str,
-    history: list[dict]
+    history: list[dict],
+    requirements: str | None = None,
 ) -> EvaluationReport:
 
     # 1. 检查是否有用户回答
@@ -84,6 +86,8 @@ def generate_evaluation(
 - 证据不足的维度使用null。
 - strengths、weaknesses、suggestions必须是字符串数组。
 - 评价要具体、建设性。
+- 岗位要求仅作为技术评价参考，不代表候选人已经掌握这些技能。
+- 不能因为岗位要求的文字描述而编造候选人的经历或能力。
 - 只返回一个合法JSON对象。
 - 不要输出Markdown代码块。
 - 不要输出JSON以外的解释。
@@ -105,7 +109,8 @@ suggestions
         HumanMessage(
             content=(
                 f"面试岗位：{position}\n"
-                f"面试难度：{difficulty}\n\n"
+                f"面试难度：{difficulty}\n"
+                f"{_format_job_requirements(requirements)}\n"
                 f"完整面试记录：\n{history_text}"
             )
         )

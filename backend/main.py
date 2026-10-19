@@ -4,7 +4,9 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Interview, Message, Evaluation
+from app.models import Interview, Message, Evaluation, JobPosting
+from app.interview_create_limiter import require_create_capacity
+# V2_BATCH4_JOB_CONTEXT
 from app.services.llm_service import (
     generate_question,
     generate_followup,
@@ -168,7 +170,10 @@ async def create_interview(
     request: InterviewCreate,
     db: Session = Depends(get_db)
 ):
-    # 1. 调用 DeepSeek 生成第一道面试题
+    # 1. AI 请求调用前限流（包括不带邀请码的旧版入口）
+    require_create_capacity()
+
+    # 2. 调用 DeepSeek 生成第一道面试题
     try:
         question = await run_in_threadpool(
             generate_question_agent,
@@ -340,13 +345,14 @@ async def interview_followup(
             "content": request.answer
         })
 
-        # 根据完整历史生成下一道追问
-        next_question = await run_in_threadpool(
-            generate_followup_agent,
-            interview.position,
-            interview.difficulty,
-            history
-        )
+        # 邀请面试读取 HR 要求；旧面试保持原有调用方式。
+        job = db.get(JobPosting, interview.job_id) if interview.job_id is not None else None
+        requirements = job.requirements if job is not None else None
+        args = (interview.position, interview.difficulty, history)
+        if requirements:
+            args += (requirements,)
+
+        next_question = await run_in_threadpool(generate_followup_agent, *args)
 
     except Exception:
         raise HTTPException(
@@ -699,6 +705,8 @@ async def create_interview_evaluation(
 
         position = interview.position
         difficulty = interview.difficulty
+        job = db.get(JobPosting, interview.job_id) if interview.job_id is not None else None
+        job_requirements = job.requirements if job is not None else None
 
     # 第二步：检查是否有用户回答
     if not any(msg["role"] == "user" for msg in history):
@@ -709,12 +717,14 @@ async def create_interview_evaluation(
 
     # 第三步：调用 AI
     try:
-        report = await run_in_threadpool(
-            generate_evaluation,
-            position=position,
-            difficulty=difficulty,
-            history=history
-        )
+        report_kwargs = {
+            "position": position,
+            "difficulty": difficulty,
+            "history": history,
+        }
+        if job_requirements:
+            report_kwargs["requirements"] = job_requirements
+        report = await run_in_threadpool(generate_evaluation, **report_kwargs)
     except Exception:
         raise HTTPException(
             status_code=502,

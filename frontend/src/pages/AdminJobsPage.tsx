@@ -143,7 +143,7 @@ export default function AdminJobsPage() {
               <option value="困难">困难</option>
             </select>
           </div>
-          <p className="jobs-hint">当前版本岗位要求用于任务展示；AI 出题按岗位与难度生成，下一阶段将结合岗位要求定制。</p>
+          <p className="jobs-hint">岗位要求将用于 AI 出题、动态追问和报告参考；请勿填写保密信息。</p>
           <button className="start-button" type="submit" disabled={saving || !form.title.trim() || !form.position.trim() || !form.requirements.trim()}>
             {saving ? "正在创建..." : "＋ 创建招聘任务"}
           </button>

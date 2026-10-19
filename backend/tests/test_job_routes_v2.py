@@ -36,7 +36,7 @@ def client(monkeypatch):
 
     app.dependency_overrides[get_db] = override_db
     monkeypatch.setattr(
-        routes, "generate_question_agent", lambda position, difficulty: "请介绍一个相关项目。"
+        routes, "generate_question_agent", lambda position, difficulty, requirements=None: "请介绍一个相关项目。"
     )
     try:
         with TestClient(app) as test_client:

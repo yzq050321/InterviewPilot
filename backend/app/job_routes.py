@@ -21,6 +21,7 @@ from app.admin_auth import require_admin
 from app.candidate_auth import create_candidate_token
 from app.database import get_db
 from app.models import Interview, JobPosting, Message
+from app.interview_create_limiter import require_create_capacity
 from app.services.agent_service import generate_question_agent
 
 logger = logging.getLogger(__name__)
@@ -176,10 +177,14 @@ async def create_invited_interview(
 
     # The candidate does not control these values.
     job_id, position, difficulty = job.id, job.position, job.difficulty
+    requirements = job.requirements
+
+    # AI 调用前执行限流，既减少费用风险，也保护共享邀请码。
+    require_create_capacity(invite_code=invite_code)
 
     try:
         question = await run_in_threadpool(
-            generate_question_agent, position, difficulty
+            generate_question_agent, position, difficulty, requirements
         )
     except APITimeoutError:
         logger.exception("邀请面试首次提问超时")
