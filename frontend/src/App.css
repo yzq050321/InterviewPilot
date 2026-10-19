@@ -685,3 +685,612 @@
 .nav-links a:hover {
   color: #6d4aff;
 }
+
+
+/* ===== B 端招聘管理后台 ===== */
+
+/* 让 B 端突破 C 端 760px 的宽度限制 */
+.main-content:has(.admin-dashboard) {
+  max-width: 1280px;
+  padding-top: 48px;
+}
+
+/* B 端页面容器 */
+.admin-dashboard {
+  width: 100%;
+}
+
+/* B 端主卡片 */
+.admin-dashboard .interview-card {
+  width: 100%;
+  padding: 36px 40px;
+}
+
+/* 后台列表的整体排版 */
+.admin-dashboard h3 {
+  margin-top: 32px;
+  margin-bottom: 20px;
+  font-size: 20px;
+  color: #172b4d;
+}
+
+/* 后台列表表格 */
+.admin-dashboard table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+/* 表格标题 */
+.admin-dashboard th {
+  padding: 16px;
+  background: #f5f6ff;
+  color: #596580;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+/* 表格内容 */
+.admin-dashboard td {
+  padding: 17px 16px;
+  border-bottom: 1px solid #edf0f7;
+  color: #27364d;
+}
+
+/* 鼠标经过时高亮 */
+.admin-dashboard tbody tr:hover {
+  background: #f8f9ff;
+}
+
+/* 退出登录按钮 */
+.admin-dashboard button {
+  cursor: pointer;
+}
+
+/* 手机和平板适配 */
+@media (max-width: 768px) {
+  .main-content:has(.admin-dashboard) {
+    padding: 24px 12px 60px;
+  }
+
+  .admin-dashboard .interview-card {
+    padding: 24px 16px;
+  }
+
+  .admin-dashboard th,
+  .admin-dashboard td {
+    padding: 12px;
+  }
+}
+
+
+/* ===== B 端数据统计卡片 ===== */
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 28px 0 36px;
+}
+
+.admin-stat-card {
+  position: relative;
+  padding: 24px;
+  background: linear-gradient(145deg, #fafaff, #f2f1ff);
+  border: 1px solid #e8e6ff;
+  border-radius: 18px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(91, 70, 230, 0.1);
+}
+
+.admin-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: #e8e4ff;
+  color: #6547e9;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.admin-stat-card p {
+  margin: 0 0 8px;
+  color: #65708a;
+  font-size: 14px;
+}
+
+.admin-stat-card strong {
+  display: block;
+  color: #202c48;
+  font-size: 34px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.admin-stat-card span {
+  display: block;
+  margin-top: 8px;
+  color: #8891a6;
+  font-size: 12px;
+}
+
+/* 窄屏幕下自动调整布局 */
+@media (max-width: 768px) {
+  .admin-stats {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .admin-stat-card {
+    padding: 20px;
+  }
+}
+
+
+/* ===== B 端退出登录按钮 ===== */
+
+.admin-logout-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #ffffff;
+  border: 1px solid #e2e5f2;
+  border-radius: 10px;
+  color: #596580;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.admin-logout-button:hover {
+  background: #f6f5ff;
+  border-color: #c9c3ff;
+  color: #5b45db;
+}
+
+
+/* B 端面试详情按钮 */
+.admin-detail-button {
+  padding: 8px 12px;
+  border: 1px solid #e5e0ff;
+  border-radius: 8px;
+  background: #f6f4ff;
+  color: #6547e9;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.admin-detail-button:hover {
+  background: #eae5ff;
+}
+
+
+/* ===== B 端面试详情：问答记录 ===== */
+
+.admin-message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.admin-message {
+  padding: 22px 26px;
+  border-radius: 16px;
+  border: 1px solid #e9eaf5;
+  line-height: 1.8;
+}
+
+.admin-message strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.admin-message p {
+  margin: 0;
+  color: #34405a;
+  font-size: 14px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+
+/* AI 面试官：浅紫色卡片 */
+.admin-message-ai {
+  background: #f5f3ff;
+  border-color: #e6e1ff;
+}
+
+.admin-message-ai strong {
+  color: #6547e9;
+}
+
+/* 候选人回答：浅蓝色卡片 */
+.admin-message-user {
+  background: #f2f7ff;
+  border-color: #e0eaff;
+}
+
+.admin-message-user strong {
+  color: #3269b5;
+}
+
+@media (max-width: 600px) {
+  .admin-message {
+    padding: 16px;
+  }
+}
+
+
+/* ===== HR 端 AI 面试评估报告 ===== */
+
+.admin-evaluation {
+  margin: 34px 0;
+  padding: 28px;
+  background: #fafaff;
+  border: 1px solid #e9e7ff;
+  border-radius: 20px;
+}
+
+.admin-evaluation > h3 {
+  margin: 0 0 24px;
+  color: #172b4d;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+/* 四项评分卡片 */
+.admin-evaluation-scores {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.admin-evaluation-scores > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 130px;
+  padding: 20px 12px;
+  background: #ffffff;
+  border: 1px solid #e7e7f5;
+  border-radius: 16px;
+}
+
+.admin-evaluation-scores span {
+  color: #66738c;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.admin-evaluation-scores strong {
+  color: #5946e8;
+  font-size: 38px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+/* 突出第一张综合评分卡片 */
+.admin-evaluation-scores > div:first-child {
+  background: linear-gradient(135deg, #6554ee, #8a74ff);
+  border-color: transparent;
+  box-shadow: 0 10px 24px rgba(101, 84, 238, 0.16);
+}
+
+.admin-evaluation-scores > div:first-child span,
+.admin-evaluation-scores > div:first-child strong {
+  color: #ffffff;
+}
+
+/* 适配平板 */
+@media (max-width: 850px) {
+  .admin-evaluation-scores {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 适配手机 */
+@media (max-width: 480px) {
+  .admin-evaluation {
+    padding: 18px;
+  }
+
+  .admin-evaluation-scores {
+    gap: 10px;
+  }
+
+  .admin-evaluation-scores > div {
+    min-height: 110px;
+    padding: 15px 8px;
+  }
+
+  .admin-evaluation-scores strong {
+    font-size: 30px;
+  }
+}
+
+
+/* ===== HR AI 评估报告：文字分析卡片 ===== */
+
+/* 每一块分析内容独立成卡片 */
+.admin-evaluation-section {
+  position: relative;
+  margin-top: 16px;
+  padding: 22px 26px;
+  background: #ffffff;
+  border: 1px solid #e8eaf4;
+  border-radius: 14px;
+  border-left: 4px solid #8b7cf6;
+  box-shadow: 0 3px 12px rgba(28, 39, 80, 0.025);
+  transition: box-shadow 0.2s ease;
+}
+
+.admin-evaluation-section:hover {
+  box-shadow: 0 8px 24px rgba(28, 39, 80, 0.06);
+}
+
+/* 卡片标题 */
+.admin-evaluation-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  color: #233453;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* 卡片正文 */
+.admin-evaluation-section p {
+  margin: 0;
+  color: #53617a;
+  font-size: 14px;
+  line-height: 2;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 1. AI 综合评价：紫色 */
+.admin-evaluation-section:nth-of-type(2) {
+  background: #f8f7ff;
+  border-color: #e5e1ff;
+  border-left-color: #7764f2;
+}
+
+/* 2. 表现亮点：绿色 */
+.admin-evaluation-section:nth-of-type(3) {
+  background: #f3fbf7;
+  border-color: #d9f0e2;
+  border-left-color: #36a878;
+}
+
+/* 3. 有待提升：橙色 */
+.admin-evaluation-section:nth-of-type(4) {
+  background: #fffaf2;
+  border-color: #fae7c8;
+  border-left-color: #e9a23b;
+}
+
+/* 4. 改进建议：蓝色 */
+.admin-evaluation-section:nth-of-type(5) {
+  background: #f4f8ff;
+  border-color: #dbe7ff;
+  border-left-color: #5486e8;
+}
+
+@media (max-width: 600px) {
+  .admin-evaluation-section {
+    padding: 18px;
+  }
+
+  .admin-evaluation-section p {
+    font-size: 13px;
+  }
+}
+
+
+/* ===== HR 评估报告：双栏排版 ===== */
+
+/* 评分区域之后的分析卡片采用网格布局 */
+.admin-evaluation:has(.admin-evaluation-scores) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px;
+  row-gap: 16px;
+}
+
+/* 标题、评分卡片和状态信息保持整行宽度 */
+.admin-evaluation > h3,
+.admin-evaluation > .admin-evaluation-scores {
+  grid-column: 1 / -1;
+}
+
+/* 四个文字分析卡片共用间距 */
+.admin-evaluation > .admin-evaluation-section {
+  margin-top: 0;
+  min-width: 0;
+}
+
+/* 综合评价：整行 */
+.admin-evaluation > .admin-evaluation-section:nth-of-type(2) {
+  grid-column: 1 / -1;
+}
+
+/* 表现亮点和有待提升：左右两列 */
+
+/* 改进建议：整行 */
+.admin-evaluation > .admin-evaluation-section:nth-of-type(5) {
+  grid-column: 1 / -1;
+}
+
+/* 窄屏恢复单列 */
+@media (max-width: 760px) {
+  .admin-evaluation:has(.admin-evaluation-scores) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-evaluation > .admin-evaluation-section {
+    grid-column: 1 / -1;
+  }
+}
+
+
+/* ===== HR 端候选人信息卡片 ===== */
+
+.admin-interview-info {
+  margin: 28px 0 32px;
+  padding: 26px 28px;
+  background: #ffffff;
+  border: 1px solid #e5e7f5;
+  border-radius: 18px;
+  box-shadow: 0 4px 20px rgba(41, 53, 102, 0.04);
+}
+
+/* 标题与面试状态 */
+.admin-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.admin-info-header h3 {
+  margin: 0 0 6px;
+  color: #172b4d;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.admin-info-header p {
+  margin: 0;
+  color: #8792aa;
+  font-size: 13px;
+}
+
+/* 面试状态标签 */
+.admin-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-status-badge.completed {
+  color: #15805c;
+  background: #e8f8f0;
+  border: 1px solid #c9efdc;
+}
+
+.admin-status-badge.ongoing {
+  color: #ac6a17;
+  background: #fff5e5;
+  border: 1px solid #f8e2b9;
+}
+
+/* 四项基础信息 */
+.admin-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 20px 22px;
+  background: #f8f9ff;
+  border: 1px solid #eef0fa;
+  border-radius: 13px;
+}
+
+.admin-info-item span {
+  color: #8590a7;
+  font-size: 13px;
+}
+
+.admin-info-item strong {
+  color: #243452;
+  font-size: 16px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+/* 手机端适配 */
+@media (max-width: 600px) {
+  .admin-interview-info {
+    padding: 18px;
+  }
+
+  .admin-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-info-item {
+    padding: 16px;
+  }
+}
+
+/* ===== HR 端面试问答标题 ===== */
+
+.admin-qa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 36px 0 20px;
+}
+
+.admin-qa-header h3 {
+  margin: 0 0 6px;
+  color: #172b4d;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.admin-qa-header p {
+  margin: 0;
+  color: #8792aa;
+  font-size: 13px;
+}
+
+.admin-qa-count {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  background: #f0edff;
+  border: 1px solid #e4ddff;
+  border-radius: 999px;
+  color: #6547e9;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .admin-qa-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

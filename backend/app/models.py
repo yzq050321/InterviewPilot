@@ -22,6 +22,19 @@ class Interview(Base):
         primary_key=True,
         autoincrement=True
     )
+    
+    # 候选人访问凭证哈希
+    candidate_token_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        unique=True,
+    )
+    
+    # 候选人姓名
+    candidate_name: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True
+    )
 
     # 目标岗位
     position: Mapped[str] = mapped_column(

@@ -19,9 +19,26 @@ from app.services.agent_service import (
     generate_followup_agent,
     generate_question_agent,
 )
+from app.admin_auth import (
+    authenticate_admin,
+    create_admin_token,
+    require_admin,
+)
 
 logger = logging.getLogger(__name__)
 from openai import APITimeoutError
+from app.candidate_auth import (
+    create_candidate_token,
+    verify_candidate_token,
+)
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Request
+from app.login_limiter import (
+    is_login_blocked,
+    record_login_failure,
+    clear_login_failures,
+    cleanup_expired_records,
+)
 
 # 创建 FastAPI 应用
 app = FastAPI(
@@ -29,6 +46,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
+candidate_bearer = HTTPBearer(auto_error=False)
 
 # 允许 React 前端访问 FastAPI 后端
 app.add_middleware(
@@ -58,22 +76,85 @@ def health_check():
     }
 
 
+
+# HR 管理员登录请求
+class AdminLoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1)
+    
+    
+    
+
+# HR 管理员登录接口
+@app.post("/api/admin/login")
+def admin_login(
+    login_data: AdminLoginRequest,
+    request: Request,
+):
+    # 从实际连接信息中获取客户端 IP
+    # 不信任前端自行提供的 X-Forwarded-For
+    client_ip = (
+        request.client.host
+        if request.client is not None
+        else "unknown"
+    )
+
+    
+    # 清理已经过期的登录记录
+    cleanup_expired_records()
+
+    # 1. 检查登录是否被暂时限制
+    if is_login_blocked(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="登录失败次数过多，请15分钟后再试",
+        )
+
+    # 2. 验证管理员账号和密码
+    if not authenticate_admin(
+        login_data.username,
+        login_data.password,
+    ):
+        record_login_failure(client_ip)
+
+        raise HTTPException(
+            status_code=401,
+            detail="账号或密码错误",
+        )
+
+    # 3. 登录成功，清除失败记录
+    clear_login_failures(client_ip)
+
+    # 4. 生成 JWT
+    token = create_admin_token()
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": 7200,
+    }
+
+
 # 定义创建面试时的数据格式
 class InterviewCreate(BaseModel):
+
+    # 候选人姓名
+    candidate_name: str = Field(min_length=1, max_length=100)
+    
 
     # 岗位名称
     position: str = Field(min_length=1, max_length=100)
 
-    # 面试难度
-    difficulty: Literal["简单", "中等", "困难"]
+    # 面试难度由招聘系统统一决定，暂不允许候选人修改
+    difficulty: Literal["中等"] = "中等"
 
-    @field_validator("position")
+    @field_validator("candidate_name", "position")
     @classmethod
-    def validate_position(cls, value: str) -> str:
+    def validate_not_blank(cls, value: str) -> str:
         value = value.strip()
 
         if not value:
-            raise ValueError("岗位名称不能为空")
+            raise ValueError("该字段不能为空")
 
         return value
 
@@ -107,15 +188,23 @@ async def create_interview(
             detail="AI 面试题生成失败"
         )
 
+   
     # 2. 创建面试记录并保存 AI 问题
     try:
+        # 为这场面试生成专属访问凭证
+        candidate_token, candidate_token_hash = create_candidate_token()
+
         interview = Interview(
+            candidate_name=request.candidate_name,
+            candidate_token_hash=candidate_token_hash,
             position=request.position,
             difficulty=request.difficulty,
             status="in_progress"
         )
 
+        # 先将新面试加入数据库会话
         db.add(interview)
+
 
         # 将 INSERT 发送给数据库，获取自增 ID
         db.flush()
@@ -132,15 +221,20 @@ async def create_interview(
         db.commit()
 
         # 3. 返回创建结果
+        
         return {
             "interview_id": interview.id,
+            "interview_token": candidate_token,
+            "candidate_name": interview.candidate_name,
             "position": interview.position,
             "difficulty": interview.difficulty,
             "question": question
         }
 
+    
     except Exception:
         db.rollback()
+        logger.exception("保存面试记录失败")
 
         raise HTTPException(
             status_code=500,
@@ -160,7 +254,8 @@ class AnswerRequest(BaseModel):
 @app.post("/api/interviews/followup")
 async def interview_followup(
     request: AnswerRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(candidate_bearer),
 ):
     # 1. 查询当前面试
     interview = db.get(
@@ -172,6 +267,21 @@ async def interview_followup(
         raise HTTPException(
             status_code=404,
             detail="面试不存在"
+        )
+
+    
+    # 验证候选人是否有权操作这场面试
+    if (
+        credentials is None
+        or not verify_candidate_token(
+            credentials.credentials,
+            interview.candidate_token_hash
+        )
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="无权操作该场面试",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     if interview.status != "in_progress":
@@ -279,7 +389,8 @@ async def interview_followup(
 
 @app.get("/api/interviews")
 def list_interviews(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
 ):
     # 1. 查询所有历史面试
     interviews = (
@@ -295,8 +406,11 @@ def list_interviews(
     result = []
 
     for interview in interviews:
+        
+    
         result.append({
             "interview_id": interview.id,
+            "candidate_name": interview.candidate_name,
             "position": interview.position,
             "difficulty": interview.difficulty,
             "status": interview.status,
@@ -306,10 +420,61 @@ def list_interviews(
     # 3. 返回历史面试列表
     return result
 
+
+
+# HR 管理员查看指定候选人的完整面试记录
+@app.get("/api/admin/interviews/{interview_id}")
+def get_admin_interview(
+    interview_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    # 1. 查询面试
+    interview = db.get(Interview, interview_id)
+
+    if interview is None:
+        raise HTTPException(
+            status_code=404,
+            detail="面试不存在"
+        )
+
+    # 2. 查询完整问答记录
+    stmt = (
+        select(Message)
+        .where(Message.interview_id == interview_id)
+        .order_by(Message.id.asc())
+    )
+
+    messages = db.scalars(stmt).all()
+
+    # 3. 整理聊天记录
+    message_list = []
+
+    for message in messages:
+        message_list.append({
+            "id": message.id,
+            "role": message.role,
+            "content": message.content,
+            "created_at": message.created_at,
+        })
+
+    # 4. 返回面试信息和完整问答
+    return {
+        "interview_id": interview.id,
+        "candidate_name": interview.candidate_name,
+        "position": interview.position,
+        "difficulty": interview.difficulty,
+        "status": interview.status,
+        "created_at": interview.created_at,
+        "messages": message_list,
+    }
+
+# 获取指定面试详情及聊天记录
 @app.get("/api/interviews/{interview_id}")
 def get_interview(
     interview_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(candidate_bearer),
 ):
     # 1. 查询面试基本信息
     interview = db.get(Interview, interview_id)
@@ -320,7 +485,21 @@ def get_interview(
             detail="面试不存在"
         )
 
-    # 2. 查询这场面试的所有消息
+    # 2. 验证候选人访问凭证
+    if (
+        credentials is None
+        or not verify_candidate_token(
+            credentials.credentials,
+            interview.candidate_token_hash
+        )
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="无权访问该场面试",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 3. 查询这场面试的所有消息
     stmt = (
         select(Message)
         .where(Message.interview_id == interview_id)
@@ -329,7 +508,7 @@ def get_interview(
 
     messages = db.scalars(stmt).all()
 
-    # 3. 整理消息数据
+    # 4. 整理消息数据
     message_list = []
 
     for message in messages:
@@ -340,7 +519,7 @@ def get_interview(
             "created_at": message.created_at
         })
 
-    # 4. 返回面试及其消息
+    # 5. 返回面试及其消息
     return {
         "interview_id": interview.id,
         "position": interview.position,
@@ -350,11 +529,11 @@ def get_interview(
         "messages": message_list
     }
 
-
 @app.patch("/api/interviews/{interview_id}/complete")
 def complete_interview(
     interview_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(candidate_bearer),
 ):
     # 1. 查询面试
     interview = db.get(Interview, interview_id)
@@ -363,6 +542,21 @@ def complete_interview(
         raise HTTPException(
             status_code=404,
             detail="面试不存在"
+        )
+
+
+    # 验证候选人是否有权结束这场面试
+    if (
+        credentials is None
+        or not verify_candidate_token(
+            credentials.credentials,
+            interview.candidate_token_hash
+        )
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="无权结束该场面试",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     # 2. 检查面试是否已经结束
@@ -392,8 +586,12 @@ def complete_interview(
 
 
 
+
 @app.get("/api/interviews/{interview_id}/evaluation")
-def get_interview_evaluation(interview_id: int):
+def get_interview_evaluation(
+    interview_id: int,
+    _: None = Depends(require_admin),
+):
 
     # 第一步：创建数据库会话
     with SessionLocal() as db:
@@ -430,9 +628,12 @@ def get_interview_evaluation(interview_id: int):
         }
 
 
-@app.post("/api/interviews/{interview_id}/evaluation")
-async def create_interview_evaluation(interview_id: int):
 
+@app.post("/api/interviews/{interview_id}/evaluation")
+async def create_interview_evaluation(
+    interview_id: int,
+    credentials: HTTPAuthorizationCredentials | None = Depends(candidate_bearer),
+):
     # 第一步：查询面试
     with SessionLocal() as db:
         interview = db.get(Interview, interview_id)
@@ -441,6 +642,20 @@ async def create_interview_evaluation(interview_id: int):
             raise HTTPException(
                 status_code=404,
                 detail="面试不存在"
+            )
+
+        # 验证候选人是否有权生成这场面试的报告
+        if (
+            credentials is None
+            or not verify_candidate_token(
+                credentials.credentials,
+                interview.candidate_token_hash
+            )
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="无权生成该场面试的评估报告",
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
         # 只有已结束的面试才能生成报告

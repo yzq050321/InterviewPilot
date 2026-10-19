@@ -37,14 +37,18 @@ export async function getInterviewEvaluation(
 }
 
 
+
 /**
- * 创建模拟面试
+ * 创建面试
  */
 export async function createInterview(
+  candidateName: string,
   position: string,
   difficulty: string
 ): Promise<{
   interview_id: number;
+  interview_token: string;
+  candidate_name: string;
   question: string;
 }> {
   const response = await fetch(`${API_BASE}/api/interviews`, {
@@ -53,6 +57,7 @@ export async function createInterview(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
+      candidate_name: candidateName,
       position,
       difficulty,
     }),
@@ -66,6 +71,7 @@ export async function createInterview(
 }
 
 
+
 /**
  * 提交用户回答并获取 AI 追问
  */
@@ -73,12 +79,22 @@ export async function submitInterviewAnswer(
   interviewId: number,
   answer: string
 ): Promise<{ next_question: string }> {
+  // 读取当前面试的候选人 Token
+  const token = sessionStorage.getItem(
+    `interview_token_${interviewId}`
+  );
+
+  if (!token) {
+    throw new Error("面试访问凭证不存在，请重新开始面试");
+  }
+
   const response = await fetch(
     `${API_BASE}/api/interviews/followup`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         interview_id: interviewId,
@@ -113,10 +129,22 @@ export async function submitInterviewAnswer(
 export async function completeInterview(
   interviewId: number
 ): Promise<void> {
+  // 读取当前面试的候选人访问凭证
+  const token = sessionStorage.getItem(
+    `interview_token_${interviewId}`
+  );
+
+  if (!token) {
+    throw new Error("面试访问凭证不存在，请重新开始面试");
+  }
+
   const response = await fetch(
     `${API_BASE}/api/interviews/${interviewId}/complete`,
     {
       method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     }
   );
 
@@ -138,16 +166,29 @@ export async function completeInterview(
 }
 
 
+
 /**
  * 生成 AI 面试评估报告
  */
 export async function generateInterviewEvaluation(
   interviewId: number
 ): Promise<void> {
+  // 读取当前面试的候选人访问凭证
+  const token = sessionStorage.getItem(
+    `interview_token_${interviewId}`
+  );
+
+  if (!token) {
+    throw new Error("面试访问凭证不存在，无法生成评估报告");
+  }
+
   const response = await fetch(
     `${API_BASE}/api/interviews/${interviewId}/evaluation`,
     {
       method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     }
   );
 
@@ -176,14 +217,29 @@ export async function generateInterviewEvaluation(
 }
 
 
+
 /**
  * 获取指定面试的详情和聊天记录
  */
 export async function getInterviewDetail(
   interviewId: number
 ): Promise<InterviewDetail> {
+  // 读取当前面试的候选人访问凭证
+  const token = sessionStorage.getItem(
+    `interview_token_${interviewId}`
+  );
+
+  if (!token) {
+    throw new Error("面试访问凭证不存在，请重新开始面试");
+  }
+
   const response = await fetch(
-    `${API_BASE}/api/interviews/${interviewId}`
+    `${API_BASE}/api/interviews/${interviewId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
   );
 
   if (!response.ok) {
@@ -195,4 +251,179 @@ export async function getInterviewDetail(
   const data: InterviewDetail = await response.json();
 
   return data;
+}
+
+
+/**
+ * HR 管理员登录
+ */
+export async function loginAdmin(
+  username: string,
+  password: string
+): Promise<{
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}> {
+  const response = await fetch(
+    `${API_BASE}/api/admin/login`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username,
+        password,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("管理员账号或密码错误");
+    }
+
+    throw new Error(`管理员登录失败：${response.status}`);
+  }
+
+  return response.json();
+}
+
+
+/**
+ * HR 获取全部候选人面试记录
+ */
+export async function getAdminInterviews(): Promise<
+  {
+    interview_id: number;
+    candidate_name: string | null;
+    position: string;
+    difficulty: string;
+    status: string;
+    created_at: string;
+  }[]
+> {
+  const token = sessionStorage.getItem("admin_token");
+
+  if (!token) {
+    throw new Error("管理员未登录，请先登录");
+  }
+
+  const response = await fetch(
+    `${API_BASE}/api/interviews`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (response.status === 401) {
+    sessionStorage.removeItem("admin_token");
+    throw new Error("管理员登录已失效，请重新登录");
+  }
+
+  if (!response.ok) {
+    throw new Error(`获取候选人面试记录失败：${response.status}`);
+  }
+
+  return response.json();
+}
+
+
+/**
+ * HR 查看指定候选人的完整面试记录
+ */
+export async function getAdminInterviewDetail(
+  interviewId: number
+): Promise<{
+  interview_id: number;
+  candidate_name: string | null;
+  position: string;
+  difficulty: string;
+  status: string;
+  created_at: string;
+  messages: {
+    id: number;
+    role: string;
+    content: string;
+    created_at: string;
+  }[];
+}> {
+  const token = sessionStorage.getItem("admin_token");
+
+  if (!token) {
+    throw new Error("管理员未登录，请先登录");
+  }
+
+  const response = await fetch(
+    `${API_BASE}/api/admin/interviews/${interviewId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (response.status === 401) {
+    sessionStorage.removeItem("admin_token");
+    throw new Error("管理员登录已失效，请重新登录");
+  }
+
+  if (!response.ok) {
+    throw new Error(`获取面试详情失败：${response.status}`);
+  }
+
+  return response.json();
+}
+
+
+/**
+ * HR 查看指定面试的 AI 评估报告
+ */
+export async function getAdminInterviewEvaluation(
+  interviewId: number
+): Promise<{
+  id: number;
+  interview_id: number;
+  technical_score: number;
+  completeness_score: number;
+  clarity_score: number;
+  overall_score: number;
+  summary: string;
+  strengths: string;
+  weaknesses: string;
+  suggestions: string;
+  created_at: string;
+}> {
+  const token = sessionStorage.getItem("admin_token");
+
+  if (!token) {
+    throw new Error("管理员未登录，请先登录");
+  }
+
+  const response = await fetch(
+    `${API_BASE}/api/interviews/${interviewId}/evaluation`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (response.status === 401) {
+    sessionStorage.removeItem("admin_token");
+    throw new Error("管理员登录已失效，请重新登录");
+  }
+
+  if (response.status === 404) {
+    throw new Error("该面试尚未生成 AI 评估报告");
+  }
+
+  if (!response.ok) {
+    throw new Error(`获取 AI 评估报告失败：${response.status}`);
+  }
+
+  return response.json();
 }

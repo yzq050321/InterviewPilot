@@ -27,3 +27,11 @@ chroma_db/
 .DS_Store
 
 *.sqlite3
+
+# Private database backups
+*.sql
+
+# Local environment secrets
+.env
+.env.*
+!.env.example

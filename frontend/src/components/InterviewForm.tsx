@@ -1,21 +1,21 @@
 
 type InterviewFormProps = {
+  candidateName: string;
   position: string;
-  difficulty: string;
   loading: boolean;
   interviewId: number | null;
+  onCandidateNameChange: (value: string) => void;
   onPositionChange: (value: string) => void;
-  onDifficultyChange: (value: string) => void;
   onStartInterview: () => void;
 };
 
 export default function InterviewForm({
+  candidateName,
   position,
-  difficulty,
   loading,
   interviewId,
+  onCandidateNameChange,
   onPositionChange,
-  onDifficultyChange,
   onStartInterview,
 }: InterviewFormProps) {
   return (
@@ -26,6 +26,23 @@ export default function InterviewForm({
           <h2>创建一场模拟面试</h2>
           <p>配置你的专属 AI 面试体验</p>
         </div>
+      </div>
+
+
+      <div className="form-group">
+        <label htmlFor="candidateName">候选人姓名</label>
+        <input
+          id="candidateName"
+          type="text"
+          value={candidateName}
+          onChange={(e) =>
+            onCandidateNameChange(e.target.value)
+          }
+          placeholder="请输入你的姓名"
+          maxLength={100}
+          autoComplete="name"
+          disabled={loading}
+        />
       </div>
 
       <div className="form-group">
@@ -41,28 +58,6 @@ export default function InterviewForm({
         />
       </div>
 
-      <div className="form-group">
-        <label>面试难度</label>
-        <div className="difficulty-options">
-          {["简单", "中等", "困难"].map((level) => (
-            <button
-              key={level}
-              type="button"
-              className={
-                difficulty === level
-                  ? "difficulty active"
-                  : "difficulty"
-              }
-              onClick={() =>
-                onDifficultyChange(level)
-              }
-              disabled={loading}
-            >
-              {level}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <button
         className="start-button"
@@ -72,8 +67,8 @@ export default function InterviewForm({
         {loading && interviewId === null
           ? "AI 正在生成面试题..."
           : interviewId !== null
-            ? "✦ 创建新的模拟面试 →"
-            : "✦ 开始 AI 模拟面试 →"}
+            ? "✦ 开始面试  →"
+            : "✦ 开始面试 →"}
       </button>
 
       <p className="card-footer">

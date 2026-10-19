@@ -20,7 +20,6 @@ type InterviewChatProps = {
 };
 
 export default function InterviewChat({
-  interviewId,
   position,
   difficulty,
   messages,
@@ -28,12 +27,10 @@ export default function InterviewChat({
   loading,
   finishing,
   completed,
-  hasEvaluation,
   chatRef,
   onAnswerChange,
   onSubmitAnswer,
   onFinishInterview,
-  onRetryReport,
 }: InterviewChatProps) {
   return (
     <section className="chat-card" ref={chatRef}>
@@ -46,9 +43,7 @@ export default function InterviewChat({
         </div>
 
         <span className="chat-status">
-          {completed
-            ? `✓ 面试 #${interviewId} 已结束`
-            : `● 面试 #${interviewId} 进行中`}
+          {completed ? "面试已结束" : "面试进行中"}
         </span>
       </div>
 
@@ -77,60 +72,48 @@ export default function InterviewChat({
         ))}
       </div>
 
+
       <div className="answer-area">
-        <label htmlFor="answer">你的回答</label>
+        {!completed ? (
+          <>
+            <label htmlFor="answer">你的回答</label>
 
-        <textarea
-          id="answer"
-          value={answer}
-          onChange={(e) =>
-            onAnswerChange(e.target.value)
-          }
-          placeholder="请输入你的回答，AI 面试官将根据你的回答继续追问..."
-          rows={5}
-          disabled={loading || finishing || completed}
-        />
+            <textarea
+              id="answer"
+              value={answer}
+              onChange={(e) => onAnswerChange(e.target.value)}
+              placeholder="请输入你的回答，AI 面试官将根据你的回答继续追问..."
+              rows={5}
+              disabled={loading || finishing}
+            />
 
-        <button
-          type="button"
-          className="start-button"
-          onClick={onSubmitAnswer}
-          disabled={
-            loading ||
-            finishing ||
-            completed ||
-            !answer.trim()
-          }
-        >
-          {loading
-            ? "AI 正在思考下一道问题..."
-            : "提交回答，继续面试 →"}
-        </button>
+            <button
+              type="button"
+              className="start-button"
+              onClick={onSubmitAnswer}
+              disabled={loading || finishing || !answer.trim()}
+            >
+              {loading
+                ? "AI 正在思考下一道问题..."
+                : "提交回答，继续面试 →"}
+            </button>
 
-        {!completed && (
-          <button
-            type="button"
-            className="finish-button"
-            onClick={onFinishInterview}
-            disabled={loading || finishing}
-          >
-            {finishing
-              ? "正在结束面试并生成报告..."
-              : "结束面试并生成 AI 评估报告"}
-          </button>
-        )}
-
-        {completed && !hasEvaluation && (
-          <button
-            type="button"
-            className="finish-button"
-            onClick={onRetryReport}
-            disabled={finishing}
-          >
-            {finishing
-              ? "正在生成评估报告..."
-              : "重新尝试生成评估报告"}
-          </button>
+            <button
+              type="button"
+              className="finish-button"
+              onClick={onFinishInterview}
+              disabled={loading || finishing}
+            >
+              {finishing
+                ? "正在结束面试并生成报告..."
+                : "结束面试"}
+            </button>
+          </>
+        ) : (
+          <div className="interview-completed">
+            <h3>面试已完成</h3>
+            <p>感谢参加本次面试，面试结果将由招聘方查看。</p>
+          </div>
         )}
       </div>
     </section>
