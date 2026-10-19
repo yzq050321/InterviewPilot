@@ -1,92 +1,116 @@
-# InterviewPilot — 基于 RAG 与 Agent 的 AI 模拟面试系统
+# InterviewPilot — 基于 RAG 与 Agent 的 AI 招聘面试系统
 
-InterviewPilot 是一个基于大语言模型的 AI 模拟面试 Web 应用，支持根据目标岗位和面试难度生成技术面试题、结合候选人回答进行动态追问，并在面试结束后生成评估报告。
+InterviewPilot 是一个基于大语言模型的 AI 招聘面试 Web 应用，包含**候选人面试端**和 **HR 招聘管理端**。
 
-项目通过 RAG（检索增强生成）为 AI 面试官提供岗位知识支持，并使用 LangChain Tool Calling 构建 AI Agent，使其能够根据任务按需调用知识检索工具。
+候选人可根据目标岗位参与 AI 模拟面试，系统结合面试历史和候选人回答进行动态追问，并在面试结束后生成 AI 评估报告。HR 可以登录招聘管理后台，查看候选人的面试记录、问答内容及评估结果。
+
+项目使用 **RAG（检索增强生成）** 为 AI 面试官提供技术知识支持，并基于 **LangChain Tool Calling** 构建面试 Agent，实现知识检索工具的按需调用。
+
+目前项目作为个人学习与求职展示作品，已完成腾讯云服务器部署及 HTTPS 演示验证。
 
 ## 核心功能
 
-* **AI 面试题生成**：根据目标岗位和难度自动生成技术面试题。
-* **动态追问**：结合完整面试历史与候选人回答，生成针对性追问。
-* **RAG 知识检索**：通过 Embedding 和 Chroma 检索岗位相关知识。
-* **Agent 工具调用**：AI 面试官可以自主选择是否调用知识检索工具。
-* **AI 面试评估**：面试结束后生成评估报告。
-* **面试历史管理**：支持查看历史记录、恢复未结束的面试。
+### 1. 候选人端：AI 模拟面试
 
-### 多页面交互
+* **岗位化面试**：根据目标岗位和面试难度生成技术面试问题。
+* **动态追问**：结合候选人回答与完整面试上下文生成针对性追问。
+* **面试记录持久化**：使用 MySQL 保存面试信息与问答记录。
+* **自动生成评估报告**：面试结束后调用大语言模型生成评估结果。
+* **候选人访问隔离**：为每场面试生成独立的随机访问令牌，限制候选人访问不属于自己的面试数据。
 
-前端使用 React、TypeScript 和 React Router，将面试创建、AI 问答、历史记录和评估报告拆分为独立页面。
+### 2. HR 端：招聘管理后台
 
-* **首页：** 选择岗位和难度，创建模拟面试。
-* **模拟面试页：** 展示完整对话，支持提交回答、AI 动态追问以及结束面试。
-* **历史记录页：** 查看历史面试详情，恢复未完成的面试，或跳转至评估报告。
-* **评估报告页：** 查看已生成的 AI 面试评分和改进建议。
+* **管理员登录**：使用管理员账号和密码登录 HR 后台。
+* **面试记录管理**：查看候选人面试列表及面试状态。
+* **面试详情查看**：查看候选人信息、面试问答和 AI 评估报告。
+* **身份认证与权限控制**：采用 bcrypt 密码哈希与 JWT 管理员认证。
+* **登录安全保护**：对管理员登录失败请求设置限流。
+* **双端数据权限隔离**：候选人无法通过候选人接口直接获取 HR 专用的评分及评估报告。
 
-面试页和报告页支持通过 URL 直接访问及刷新恢复。前端根据面试 ID 调用 FastAPI 接口，从 MySQL 中读取已保存的数据。
+### 3. RAG 与 Agent
 
+* **RAG 知识检索**：使用 Embedding 和 Chroma 检索与技术岗位相关的知识片段。
+* **Agent 工具调用**：基于 LangChain Tool Calling，让 AI 面试官根据任务需要调用知识检索工具。
+* **上下文驱动的面试交互**：结合岗位要求、历史问题及候选人回答，生成后续问题。
 
 ## 技术栈
 
-| 分类        | 技术                      |
-| --------- | ----------------------- |
-| 后端        | Python、FastAPI、Pydantic |
-| 大语言模型     | DeepSeek                |
-| AI 应用框架   | LangChain               |
-| Agent     | Tool Calling            |
-| Embedding | 阿里云百炼 Qwen-Embedding    |
-| 向量数据库     | Chroma                  |
-| 关系型数据库    | MySQL、SQLAlchemy        |
-| 前端        | React + TypeScript + Vite + React Router   |
-| 基础测试      | pytest                  |
+| 分类        | 技术                                  |
+| --------- | ----------------------------------- |
+| 前端        | React、TypeScript、Vite、React Router  |
+| 后端        | Python、FastAPI、Pydantic             |
+| 大语言模型     | DeepSeek                            |
+| AI 应用框架   | LangChain、Tool Calling              |
+| Embedding | 阿里云百炼 Qwen-Embedding                |
+| 向量数据库     | Chroma                              |
+| 关系型数据库    | MySQL、SQLAlchemy                    |
+| 身份认证      | JWT、bcrypt、候选人随机访问令牌                |
+| 部署        | 腾讯云 Lighthouse、Ubuntu、Nginx、systemd |
+| HTTPS 演示  | Cloudflare Tunnel                   |
+| 测试        | pytest、接口与业务流程验证                    |
 
 ## 系统架构
 
-```text
-React Frontend
-      |
-      v
-FastAPI Backend
-      |
-      +----------------------+
-      |                      |
-      v                      v
-AI Interview Agent       MySQL
-(DeepSeek + LangChain)   (面试与消息记录)
-      |
-      v
-Tool Calling
-      |
-      v
-RAG Knowledge Tool
-      |
-      v
-Qwen-Embedding + Chroma
-      |
-      v
-岗位知识库
-```
+InterviewPilot 采用前后端分离架构，分别为候选人和 HR 提供业务入口。
+
+**业务流程：**
+
+1. 候选人填写姓名、目标岗位等信息，创建面试。
+2. FastAPI 调用 AI 面试 Agent，生成面试问题。
+3. 候选人提交回答后，Agent 根据面试上下文决定是否进行知识检索，并生成后续追问。
+4. 面试记录和问答内容保存至 MySQL。
+5. 面试结束后，后端生成 AI 评估报告。
+6. HR 登录招聘管理后台，查看候选人面试详情及评估结果。
+
+**AI 面试链路：**
+
+* React 前端向 FastAPI 提交请求。
+* FastAPI 组织面试任务与历史上下文。
+* LangChain Agent 调用 DeepSeek。
+* Agent 根据需要调用 RAG 检索工具。
+* RAG 工具通过 Qwen-Embedding 和 Chroma 检索岗位知识。
+* FastAPI 将生成结果和面试记录持久化至 MySQL。
 
 ## RAG 工作流程
 
-1. 使用 LangChain 读取岗位知识文档。
-2. 将文档切分为多个 Chunk。
-3. 调用 Qwen-Embedding 将文本转换为向量。
-4. 将知识片段和向量存储到 Chroma。
-5. 根据面试任务检索相关知识，为 AI 面试官提供参考。
-(目前知识库主要收录 Python 后端开发相关技术内容，包括 Python、FastAPI、MySQL 和异步编程等知识。当前使用小规模 Markdown 文档验证 RAG 检索流程，后续计划扩展更多岗位知识。)
+1. 使用 LangChain 读取岗位技术知识文档。
+2. 将文档切分为多个文本 Chunk。
+3. 使用 Qwen-Embedding 将文本转换为向量。
+4. 将知识片段及其向量存储到 Chroma。
+5. 在面试任务中检索相关知识，为 AI 面试官提供参考。
 
-
+**当前实现范围：** 知识库主要包含 Python 后端开发相关内容，例如 Python、FastAPI、MySQL 和异步编程。目前使用小规模 Markdown 文档验证检索流程，后续计划扩展更多技术岗位的知识内容。
 
 ## Agent 工作流程
 
-1. FastAPI 接收创建面试或提交回答的请求。
-2. 系统向 Agent 提供岗位、难度或面试历史。
-3. DeepSeek 根据任务判断是否调用知识检索工具。
-4. 后端执行相应 Tool，并将检索结果返回模型。
-5. Agent 生成面试题或追问。
-6. FastAPI 将相关面试数据保存到 MySQL。
+1. FastAPI 接收面试创建或候选人回答请求。
+2. 后端向 Agent 提供目标岗位、面试难度和相关历史信息。
+3. DeepSeek 判断是否需要调用知识检索工具。
+4. 后端执行工具并将检索结果返回模型。
+5. Agent 生成面试问题或动态追问。
+6. FastAPI 保存面试及消息数据。
 
-当前 Agent 使用单轮工具调用流程，后续可进一步扩展工具类型与状态管理能力。
+当前 Agent 采用单轮工具调用流程，后续可进一步扩展工具类型与状态管理能力。
+
+## 权限与安全设计
+
+项目针对招聘场景实现了候选人和 HR 两类访问权限。
+
+**候选人端**
+
+* 创建面试时生成随机访问令牌。
+* 后端保存令牌的 SHA-256 哈希值。
+* 候选人使用令牌访问对应面试。
+* 候选人不能直接读取 HR 专用评估报告。
+
+**HR 管理端**
+
+* 使用 bcrypt 保存管理员密码哈希。
+* 登录成功后签发 JWT。
+* 需要管理员身份的接口验证 JWT。
+* 管理员登录接口包含失败次数限制。
+
+这些措施用于支持项目演示中的基本访问控制。正式招聘场景仍需进一步完善安全审计、个人信息保护、数据保留与删除策略等机制。
 
 ## 本地运行
 
@@ -94,79 +118,93 @@ Qwen-Embedding + Chroma
 
 进入后端目录：
 
-```bash
-cd backend
-```
+`cd backend`
 
-创建并激活 Python 虚拟环境，安装依赖：
+创建 Python 虚拟环境并安装依赖：
 
-```bash
-pip install -r requirements.txt
-```
+`pip install -r requirements.txt`
 
-根据 `backend/.env.example` 配置本地环境变量。
+参考 `backend/.env.example` 配置本地环境变量，并准备 MySQL 数据库及项目所需的数据表。
 
-首次运行需要准备 MySQL 数据库，并根据项目数据库模型初始化相关数据表。
+HR 管理员认证需要配置管理员用户名、bcrypt 密码哈希和 JWT 密钥。请勿将真实密码、API Key 或密钥提交至 GitHub。
 
 构建 RAG 知识库：
 
-```bash
-python build_knowledge.py
-```
+`python build_knowledge.py`
 
 启动 FastAPI：
 
-```bash
-python -m uvicorn main:app --reload
-```
+`python -m uvicorn main:app --reload`
 
-接口文档：
+后端接口文档：
 
-http://127.0.0.1:8000/docs
+`http://127.0.0.1:8000/docs`
 
 ### 2. 启动前端
 
-```bash
-cd ../frontend
-npm install
-npm run dev
-```
+进入前端目录：
 
-浏览器访问终端输出的本地地址，通常为：
+`cd ../frontend`
 
-http://localhost:5173/
+安装依赖并启动开发服务器：
+
+`npm install`
+
+`npm run dev`
+
+浏览器访问终端提供的开发地址，通常为：
+
+`http://localhost:5173/`
 
 ## 项目展示
 
-### 1. 首页 — 创建模拟面试
+目前招聘版包含以下主要页面：
 
-选择目标岗位和面试难度，创建新的 AI 模拟面试。
+**候选人首页**
 
-![创建模拟面试](docs/home-demo.png)
+候选人填写姓名、目标岗位和面试难度，创建 AI 模拟面试。
 
-### 2. AI 模拟面试
+**AI 面试页面**
 
-AI 面试官根据岗位和难度生成问题，并结合历史回答继续追问。
+候选人与 AI 面试官进行问答，系统根据已有回答动态生成后续问题。
 
-![AI 模拟面试](docs/interview-demo.png)
+**HR 登录页面**
 
-### 3. 历史面试管理
+招聘管理员通过账号密码登录后台。
 
-查看历史面试记录，支持恢复未完成的面试，以及跳转查看已完成面试的评估报告。
+**HR 招聘管理后台**
 
-![历史面试记录](docs/history-demo.png)
+查看候选人面试列表、面试状态和相关记录。
 
-### 4. AI 面试评估报告
+**HR 面试详情及 AI 评估报告**
 
-面试结束后生成评估报告，展示评分和改进建议。
+查看完整问答记录，以及 AI 生成的评分和评估内容。
 
-![AI 面试评估](docs/evaluation-demo.png)
+项目截图将在更新为招聘版实际页面后补充，避免与旧版界面混淆。
 
+## 云端部署
 
-## 后续优化
+项目已在腾讯云 Lighthouse（Ubuntu）完成部署，使用：
 
-* 扩展更多岗位的技术知识库。
-* 根据 Markdown 标题优化 Chunk 切分。
-* 增加检索相关性过滤及知识库引用。
-* 进一步优化 Agent 的工具调用策略。
-* 增加更多自动化测试与部署支持。
+* **Nginx**：托管 React 构建产物并反向代理 FastAPI。
+* **systemd**：管理 FastAPI 后端服务。
+* **MySQL**：保存面试、消息及相关业务数据。
+* **Cloudflare Tunnel**：提供临时 HTTPS 演示入口。
+
+当前 Cloudflare Quick Tunnel 属于临时演示方案，其 URL 可能随隧道重启发生变化，不作为长期生产部署地址。
+
+## 后续优化方向
+
+* 扩充多岗位 RAG 知识库。
+* 优化文本 Chunk 切分与检索相关性。
+* 增加知识检索引用与结果可解释性。
+* 扩展 Agent 工具调用及状态管理能力。
+* 补充自动化测试和完整部署文档。
+* 完善候选人隐私保护与数据管理机制。
+* 优化 AI 评估的稳定性、公平性与人工复核流程。
+
+## 项目说明
+
+InterviewPilot 是个人独立开发的 AI 应用实践项目，重点探索 **LLM + RAG + Agent 在招聘面试流程中的应用**，同时实践前后端开发、数据库持久化、身份认证、访问控制与云端部署。
+
+AI 生成的面试评估仅作为辅助参考，不应成为真实招聘录用决策的唯一依据。
