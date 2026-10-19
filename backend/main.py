@@ -20,6 +20,7 @@ import logging
 from app.services.agent_service import (
     generate_followup_agent,
     generate_question_agent,
+    generate_competency_question_agent,
 )
 from app.admin_auth import (
     authenticate_admin,
@@ -43,6 +44,7 @@ from app.login_limiter import (
 )
 
 from app.job_routes import router as job_router
+from app.structured_interview import stage_after_answer, CLOSING_MESSAGE, QUESTION_LIMIT
 
 # 创建 FastAPI 应用
 app = FastAPI(
@@ -299,6 +301,17 @@ async def interview_followup(
             detail="当前面试已结束"
         )
 
+    # 招聘任务结构化面试最多八次候选人回答：四维、每维两次。
+    if interview.job_id is not None:
+        answered = db.scalars(
+            select(Message.id).where(
+                Message.interview_id == interview.id,
+                Message.role == "user",
+            )
+        ).all()
+        if len(answered) >= QUESTION_LIMIT:
+            raise HTTPException(status_code=409, detail="面试问题已全部回答，请结束面试")
+
     # 2. 查询这场面试最近的一道 AI 问题
     stmt = (
         select(Message)
@@ -345,16 +358,34 @@ async def interview_followup(
             "content": request.answer
         })
 
-        # 邀请面试读取 HR 要求；旧面试保持原有调用方式。
+        # 邀请面试的提问维度由后端控制，避免模型一直只问技术题。
         job = db.get(JobPosting, interview.job_id) if interview.job_id is not None else None
         requirements = job.requirements if job is not None else None
-        args = (interview.position, interview.difficulty, history)
-        if requirements:
-            args += (requirements,)
+        answer_count = sum(1 for item in history if item["role"] == "user")
+        next_stage = stage_after_answer(answer_count) if interview.job_id is not None else None
 
-        next_question = await run_in_threadpool(generate_followup_agent, *args)
+        if next_stage == "finished":
+            # 第八次回答后不额外调用模型，提示候选人提交完成。
+            next_question = CLOSING_MESSAGE
+        elif next_stage in (None, "technical_followup"):
+            args = (interview.position, interview.difficulty, history)
+            if requirements:
+                args += (requirements,)
+            next_question = await run_in_threadpool(generate_followup_agent, *args)
+        else:
+            next_question = await run_in_threadpool(
+                generate_competency_question_agent,
+                interview.position,
+                interview.difficulty,
+                requirements,
+                next_stage,
+                history,
+            )
 
+    except HTTPException:
+        raise
     except Exception:
+        logger.exception("生成下一道面试题失败")
         raise HTTPException(
             status_code=502,
             detail="AI 追问生成失败"
@@ -386,7 +417,9 @@ async def interview_followup(
 
         return {
             "interview_id": interview.id,
-            "next_question": next_question
+            "next_question": next_question,
+            "finished_questions": next_stage == "finished",
+            "interview_stage": next_stage,
         }
 
     except Exception:
@@ -634,6 +667,7 @@ def get_interview_evaluation(
             "strengths": evaluation.strengths,
             "weaknesses": evaluation.weaknesses,
             "suggestions": evaluation.suggestions,
+            "competency_assessment": evaluation.competency_assessment,
             "created_at": evaluation.created_at
         }
 
@@ -707,6 +741,7 @@ async def create_interview_evaluation(
         difficulty = interview.difficulty
         job = db.get(JobPosting, interview.job_id) if interview.job_id is not None else None
         job_requirements = job.requirements if job is not None else None
+        structured_interview = interview.job_id is not None
 
     # 第二步：检查是否有用户回答
     if not any(msg["role"] == "user" for msg in history):
@@ -724,6 +759,8 @@ async def create_interview_evaluation(
         }
         if job_requirements:
             report_kwargs["requirements"] = job_requirements
+        if structured_interview:
+            report_kwargs["structured"] = True
         report = await run_in_threadpool(generate_evaluation, **report_kwargs)
     except Exception:
         raise HTTPException(
@@ -756,7 +793,8 @@ async def create_interview_evaluation(
             summary=report.summary,
             strengths=report.strengths,
             weaknesses=report.weaknesses,
-            suggestions=report.suggestions
+            suggestions=report.suggestions,
+            competency_assessment=getattr(report, "competency_assessment", None),
         )
 
         try:
@@ -773,7 +811,7 @@ async def create_interview_evaluation(
         return {
             "evaluation_id": evaluation.id,
             "interview_id": evaluation.interview_id,
-            "overall_score": evaluation.overall_score,
+            # 候选人接口只确认报告已生成，不返回 HR 专用的分数。
             "message": "评估报告生成成功"
         }
 

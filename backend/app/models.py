@@ -152,6 +152,12 @@ class Evaluation(Base):
         nullable=True
     )
 
+    # 招聘版综合能力结构化评估；旧版报告可为空
+    competency_assessment = Column(
+        JSON,
+        nullable=True,
+    )
+
     summary = Column(
         Text,
         nullable=False

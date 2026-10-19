@@ -13,6 +13,58 @@ type AdminEvaluation = Awaited<
     ReturnType<typeof getAdminInterviewEvaluation>
 >;
 
+// 后端 V2 新增的报告字段；旧版报告没有此字段时保持兼容。
+type CompetencyDimension = {
+    score: number | null;
+    evidence: string | null;
+    observation: string;
+    limitations: string;
+    answer_count: number;
+};
+type CompetencyReport = {
+    version: number;
+    dimensions: Record<string, CompetencyDimension>;
+    review_notice: string;
+};
+const competencyLabels = [
+    ["technical", "技术理解与回答"],
+    ["communication", "沟通能力情境"],
+    ["learning", "学习能力情境"],
+    ["execution", "执行能力情境"],
+] as const;
+
+function CompetencyPanel({ report }: { report?: CompetencyReport | null }) {
+    if (!report?.dimensions) return null;
+    return (
+        <div className="admin-evaluation-section" style={{ marginTop: 20 }}>
+            <h4>四维情境能力评估（需人工复核）</h4>
+            <p style={{ color: "#566582", marginBottom: 16 }}>{report.review_notice}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                {competencyLabels.map(([key, label]) => {
+                    const item = report.dimensions[key];
+                    if (!item) return null;
+                    return (
+                        <div key={key} style={{ padding: 16, border: "1px solid #dee1f6", borderRadius: 12, background: "#fff" }}>
+                            <div style={{ fontWeight: 700 }}>{label}</div>
+                            <div style={{ fontSize: 23, fontWeight: 700, margin: "8px 0", color: "#4f46e5" }}>
+                                {typeof item.score === "number" ? `${item.score} / 100` : "证据不足 · 未评分"}
+                            </div>
+                            <p style={{ fontSize: 13 }}>回答数量：{item.answer_count ?? 0}</p>
+                            {item.evidence && (
+                                <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 13 }}>
+                                    <strong>原回答摘录：</strong>“{item.evidence}”
+                                </p>
+                            )}
+                            <p style={{ fontSize: 13, whiteSpace: "pre-wrap" }}><strong>观察：</strong>{item.observation}</p>
+                            <p style={{ fontSize: 13, whiteSpace: "pre-wrap" }}><strong>限制：</strong>{item.limitations}</p>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 export default function AdminInterviewDetailPage() {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
@@ -217,6 +269,12 @@ export default function AdminInterviewDetailPage() {
                                             <strong>{evaluation.clarity_score}</strong>
                                         </div>
                                     </div>
+
+                                    <CompetencyPanel
+                                        report={(evaluation as AdminEvaluation & {
+                                            competency_assessment?: CompetencyReport | null;
+                                        }).competency_assessment}
+                                    />
 
                                     <div className="admin-evaluation-section">
                                         <h4>AI 综合评价</h4>

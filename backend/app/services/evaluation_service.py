@@ -7,6 +7,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.services.model_client import llm
 from app.services.agent_service import _format_job_requirements
+from app.structured_interview import verify_competency_evidence
 
 
 class EvaluationReport(BaseModel):
@@ -32,6 +33,7 @@ class EvaluationReport(BaseModel):
     strengths: list[str]
     weaknesses: list[str]
     suggestions: list[str]
+    competency_assessment: dict | None = None
 
 
 def generate_evaluation(
@@ -39,6 +41,7 @@ def generate_evaluation(
     difficulty: str,
     history: list[dict],
     requirements: str | None = None,
+    structured: bool = False,
 ) -> EvaluationReport:
 
     # 1. 检查是否有用户回答
@@ -103,6 +106,26 @@ weaknesses
 suggestions
 """
 
+    # 对受邀面试附加维度证据，不能仅凭总体印象编造能力分数。
+    if structured:
+        system_prompt += """
+
+这是“技术、沟通、学习、执行”固定四维的招聘初面。
+除原有 JSON 字段，额外返回 competency_assessment 对象，包含
+technical、communication、learning、execution 四个键。
+每个维度包含：
+- score：0~100整数；没有足够证据时返回null；
+- evidence：从本维度候选人的原始回答中逐字摘录4~250个字符，不能修改、改写或编造；
+- observation：对此段文字回答的具体分析，不能据此断言其真实人格或工作胜任力；
+- limitations：说明这次简短文字面试无法确认的事项，建议人工复核。
+
+候选人第1~2条回答对应技术，第3~4条对应沟通，第5~6条对应学习，第7~8条对应执行。
+没有本维度回答时 score/evidence 必须为 null。
+不允许以问题、岗位要求、模型知识为候选人编造证据。
+这是辅助 HR 人工复核的材料，不是自动录用或淘汰依据。
+只输出合法 JSON，不能附加代码块或其他解释。
+"""
+
     # 4. 构建请求
     messages = [
         SystemMessage(content=system_prompt),
@@ -131,5 +154,12 @@ suggestions
     report = EvaluationReport.model_validate(
         result_dict
     )
+
+    if structured:
+        report.competency_assessment = verify_competency_evidence(
+            result_dict.get("competency_assessment"), history
+        )
+    else:
+        report.competency_assessment = None
 
     return report
