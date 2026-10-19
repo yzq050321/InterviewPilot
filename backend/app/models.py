@@ -1,6 +1,6 @@
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, JSON
+from sqlalchemy import Column, Integer, JSON, Boolean
 from sqlalchemy import (
     String,
     Text,
@@ -171,4 +171,64 @@ class Evaluation(Base):
         DateTime,
         server_default=func.now(),
         nullable=False
+    )
+    
+    
+    
+# HR 招聘任务表
+class JobPosting(Base):
+    __tablename__ = "job_postings"
+
+    # 招聘任务 ID
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    # 招聘任务名称，例如：Python 后端实习生招聘
+    title: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    # 招聘岗位
+    position: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    # 岗位要求，由 HR 填写
+    requirements: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    # 面试难度
+    difficulty: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default="中等",
+    )
+
+    # 随机邀请码
+    # 后续由后端使用 secrets 生成，不能使用自增 ID 代替
+    invite_code: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+
+    # 是否允许候选人通过邀请链接创建面试
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    # 创建时间
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
     )
