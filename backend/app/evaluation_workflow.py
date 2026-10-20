@@ -24,7 +24,7 @@ LEASE_MINUTES = 15
 
 def utc_naive() -> datetime:
     """Store naive UTC datetimes compatible with MySQL DATETIME."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
 
 
 def get_evaluation_state(interview: Interview, has_report: bool) -> str:
