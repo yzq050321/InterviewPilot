@@ -19,6 +19,7 @@ type AdminInterview = {
 
 export default function AdminDashboardPage() {
     const navigate = useNavigate();
+    const demoMode = sessionStorage.getItem("admin_role") === "demo";
 
     const [interviews, setInterviews] = useState<AdminInterview[]>([]);
     const [keyword, setKeyword] = useState("");
@@ -97,6 +98,7 @@ export default function AdminDashboardPage() {
 
     function handleLogout() {
         sessionStorage.removeItem("admin_token");
+        sessionStorage.removeItem("admin_role");
         navigate("/admin/login");
     }
 
@@ -125,8 +127,8 @@ export default function AdminDashboardPage() {
                 <div className="card-heading">
                     <div className="card-icon">▣</div>
                     <div>
-                        <h2>招聘管理后台</h2>
-                        <p>候选人面试记录管理</p>
+                        <h2>招聘管理后台{demoMode ? " · 只读演示" : ""}</h2>
+                        <p>{demoMode ? "以下记录均为预置虚构样本，与真实候选人数据隔离。" : "候选人面试记录管理"}</p>
                     </div>
                 </div>
 
@@ -134,7 +136,7 @@ export default function AdminDashboardPage() {
                 <div className="jobs-dashboard-entry">
                     <div>
                         <strong>招聘任务与面试邀请</strong>
-                        <p>创建招聘岗位、复制邀请链接，让候选人进入指定岗位的 AI 面试。</p>
+                        <p>{demoMode ? "浏览虚构岗位及邀请工作流示例；演示账号不可创建或修改真实任务。" : "创建招聘岗位、复制邀请链接，让候选人进入指定岗位的 AI 面试。"}</p>
                     </div>
                     <button type="button" className="admin-detail-button"
                         onClick={() => navigate("/admin/jobs")}>管理招聘任务 →</button>

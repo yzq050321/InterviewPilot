@@ -76,7 +76,9 @@ async function adminFetch(path: string, init: RequestInit = {}): Promise<Respons
 }
 
 export async function getJobs(): Promise<JobPosting[]> {
-  const response = await adminFetch("/api/admin/jobs");
+  const path = sessionStorage.getItem("admin_role") === "demo"
+    ? "/api/demo/jobs" : "/api/admin/jobs";
+  const response = await adminFetch(path);
   if (!response.ok) return readError(response, "加载招聘任务失败");
   return response.json();
 }

@@ -24,7 +24,9 @@ from app.services.agent_service import (
 )
 from app.admin_auth import (
     authenticate_admin,
+    authenticate_demo,
     create_admin_token,
+    create_demo_token,
     require_admin,
 )
 
@@ -46,6 +48,7 @@ from app.login_limiter import (
 from app.job_routes import router as job_router
 from app.structured_interview import stage_after_answer, CLOSING_MESSAGE, QUESTION_LIMIT
 from app.admin_workflow import router as admin_workflow_router
+from app.demo_routes import router as demo_router
 from app.evaluation_workflow import get_evaluation_state, generate_and_store_report
 
 # 创建 FastAPI 应用
@@ -56,6 +59,7 @@ app = FastAPI(
 
 app.include_router(job_router)
 app.include_router(admin_workflow_router)
+app.include_router(demo_router)
 
 candidate_bearer = HTTPBearer(auto_error=False)
 
@@ -121,28 +125,23 @@ def admin_login(
             detail="登录失败次数过多，请15分钟后再试",
         )
 
-    # 2. 验证管理员账号和密码
-    if not authenticate_admin(
-        login_data.username,
-        login_data.password,
-    ):
+    # 2. 验证真实管理员或独立 Demo 凭证（均受同一登录限流保护）。
+    # Demo 不取得 require_admin 权限，也不读取任何真实数据库内容。
+    if authenticate_admin(login_data.username, login_data.password):
+        role = "admin"
+    elif authenticate_demo(login_data.username, login_data.password):
+        role = "demo"
+    else:
         record_login_failure(client_ip)
+        raise HTTPException(status_code=401, detail="账号或密码错误")
 
-        raise HTTPException(
-            status_code=401,
-            detail="账号或密码错误",
-        )
-
-    # 3. 登录成功，清除失败记录
     clear_login_failures(client_ip)
-
-    # 4. 生成 JWT
-    token = create_admin_token()
-
+    token = create_admin_token() if role == "admin" else create_demo_token()
     return {
         "access_token": token,
         "token_type": "bearer",
         "expires_in": 7200,
+        "role": role,
     }
 
 

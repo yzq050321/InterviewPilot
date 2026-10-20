@@ -264,6 +264,7 @@ export async function loginAdmin(
   access_token: string;
   token_type: string;
   expires_in: number;
+  role: "admin" | "demo";
 }> {
   const response = await fetch(
     `${API_BASE}/api/admin/login`,
@@ -313,8 +314,10 @@ export async function getAdminInterviews(): Promise<
     throw new Error("管理员未登录，请先登录");
   }
 
+  const path = sessionStorage.getItem("admin_role") === "demo"
+    ? "/api/demo/interviews" : "/api/interviews";
   const response = await fetch(
-    `${API_BASE}/api/interviews`,
+    `${API_BASE}${path}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -361,8 +364,10 @@ export async function getAdminInterviewDetail(
     throw new Error("管理员未登录，请先登录");
   }
 
+  const path = sessionStorage.getItem("admin_role") === "demo"
+    ? `/api/demo/interviews/${interviewId}` : `/api/admin/interviews/${interviewId}`;
   const response = await fetch(
-    `${API_BASE}/api/admin/interviews/${interviewId}`,
+    `${API_BASE}${path}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -407,8 +412,11 @@ export async function getAdminInterviewEvaluation(
     throw new Error("管理员未登录，请先登录");
   }
 
+  const path = sessionStorage.getItem("admin_role") === "demo"
+    ? `/api/demo/interviews/${interviewId}/evaluation`
+    : `/api/interviews/${interviewId}/evaluation`;
   const response = await fetch(
-    `${API_BASE}/api/interviews/${interviewId}/evaluation`,
+    `${API_BASE}${path}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,

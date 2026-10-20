@@ -71,6 +71,7 @@ function CompetencyPanel({ report }: { report?: CompetencyReport | null }) {
 
 export default function AdminInterviewDetailPage() {
     const navigate = useNavigate();
+    const demoMode = sessionStorage.getItem("admin_role") === "demo";
     const { id } = useParams<{ id: string }>();
 
     const [interview, setInterview] = useState<AdminInterviewDetail | null>(null);
@@ -229,7 +230,7 @@ export default function AdminInterviewDetailPage() {
                     <div className="card-icon">▣</div>
                     <div>
                         <h2>候选人面试详情</h2>
-                        <p>查看候选人的完整 AI 面试问答记录</p>
+                        <p>{demoMode ? "只读演示：以下为虚构问答与模拟评估报告，不涉及真实候选人。" : "查看候选人的完整 AI 面试问答记录"}</p>
                     </div>
                 </div>
 
@@ -299,7 +300,7 @@ export default function AdminInterviewDetailPage() {
                             </p>
                             {workflowNotice && <p role="status" style={{ color: "#3c4e90" }}>{workflowNotice}</p>}
                             {workflowError && <p className="error" role="alert">{workflowError}</p>}
-                            {interview.status === "completed" && !evaluation &&
+                            {!demoMode && interview.status === "completed" && !evaluation &&
                                 interview.evaluation_status !== "generating" && !evaluationLoading && (
                                 <button type="button" className="admin-detail-button" disabled={retrying}
                                     onClick={() => { void handleRetry(); }} style={{ marginBottom: 16 }}>
@@ -378,7 +379,9 @@ export default function AdminInterviewDetailPage() {
                                     </div>
                                     <span className="admin-review-tag">仅 HR 可见</span>
                                 </div>
-                                <div className="admin-review-form">
+                                {demoMode ? (
+                                    <p>演示模式仅展示人工复核结果：{reviewLabels[reviewStatus]}。不能修改或提交复核。</p>
+                                ) : <div className="admin-review-form">
                                     <div className="admin-review-field">
                                         <label htmlFor="hr-review-status">处理状态</label>
                                         <select id="hr-review-status" value={reviewStatus}
@@ -405,7 +408,7 @@ export default function AdminInterviewDetailPage() {
                                     {workflowNotice.includes("人工复核已保存") && (
                                         <p className="admin-review-success" role="status">✓ 已保存，刷新页面后仍可查看。</p>
                                     )}
-                                </div>
+                                </div>}
                             </section>
                         )}
                         <div className="admin-qa-header">

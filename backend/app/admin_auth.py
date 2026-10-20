@@ -37,8 +37,7 @@ def verify_password(
 def authenticate_admin(username: str, password: str) -> bool:
     """验证 HR 管理员账号和密码。"""
 
-    load_dotenv()
-
+    # .env 已在模块加载时读取；不要在每次请求时恢复已移除的环境变量。
     admin_username = os.getenv("ADMIN_USERNAME")
     admin_password_hash = os.getenv("ADMIN_PASSWORD_HASH")
 
@@ -128,5 +127,61 @@ def require_admin(
         raise HTTPException(
             status_code=401,
             detail="登录已失效，请重新登录",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+# 演示账户仅在显式配置 DEMO_USERNAME / DEMO_PASSWORD_HASH 时启用。
+# 绝不使用默认口令，也绝不复用真实管理员的凭证。
+def authenticate_demo(username: str, password: str) -> bool:
+    demo_username = os.getenv("DEMO_USERNAME")
+    demo_password_hash = os.getenv("DEMO_PASSWORD_HASH")
+    admin_username = os.getenv("ADMIN_USERNAME")
+    if (
+        not demo_username or not demo_password_hash
+        or demo_username == admin_username or username != demo_username
+    ):
+        return False
+    try:
+        return verify_password(password, demo_password_hash)
+    except ValueError:
+        return False
+
+
+def create_demo_token() -> str:
+    secret = os.getenv("ADMIN_JWT_SECRET")
+    if not secret or len(secret) < 32:
+        raise RuntimeError("ADMIN_JWT_SECRET 未正确配置")
+    now = datetime.now(timezone.utc)
+    return jwt.encode(
+        {"sub": "demo", "role": "demo", "iat": now, "exp": now + timedelta(hours=2)},
+        secret, algorithm="HS256",
+    )
+
+
+def verify_demo_token(token: str) -> bool:
+    # 关掉 Demo 账号配置即可让尚未过期的 Demo JWT 立即失效。
+    demo_username = os.getenv("DEMO_USERNAME")
+    if not demo_username or not os.getenv("DEMO_PASSWORD_HASH") or demo_username == os.getenv("ADMIN_USERNAME"):
+        return False
+    secret = os.getenv("ADMIN_JWT_SECRET")
+    if not secret or len(secret) < 32:
+        return False
+    try:
+        payload = jwt.decode(
+            token, secret, algorithms=["HS256"],
+            options={"require": ["sub", "role", "iat", "exp"]},
+        )
+        return payload.get("sub") == "demo" and payload.get("role") == "demo"
+    except jwt.InvalidTokenError:
+        return False
+
+
+def require_demo(
+    credentials: HTTPAuthorizationCredentials | None = Depends(admin_bearer),
+) -> None:
+    """Demo 令牌只能调用只读演示接口，不能访问真实 HR API。"""
+    if credentials is None or not verify_demo_token(credentials.credentials):
+        raise HTTPException(
+            status_code=401, detail="演示账号未登录或登录已过期",
             headers={"WWW-Authenticate": "Bearer"},
         )

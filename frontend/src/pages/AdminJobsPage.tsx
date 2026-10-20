@@ -17,6 +17,7 @@ const INITIAL_FORM: CreateJobInput = {
 
 export default function AdminJobsPage() {
   const navigate = useNavigate();
+  const demoMode = sessionStorage.getItem("admin_role") === "demo";
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [form, setForm] = useState<CreateJobInput>({ ...INITIAL_FORM });
   const [loading, setLoading] = useState(true);
@@ -109,12 +110,12 @@ export default function AdminJobsPage() {
         <div className="jobs-heading">
           <div>
             <h2>招聘任务管理</h2>
-            <p className="jobs-subtitle">创建岗位任务 → 复制链接 → 邀请候选人参加 AI 面试</p>
+            <p className="jobs-subtitle">{demoMode ? "只读演示：预置的虚构岗位，不能创建、停用或发送邀请。" : "创建岗位任务 → 复制链接 → 邀请候选人参加 AI 面试"}</p>
           </div>
           <Link className="jobs-back" to="/admin">← 返回招聘后台</Link>
         </div>
 
-        <form className="jobs-form" onSubmit={(event) => { void handleCreate(event); }}>
+        {!demoMode && <form className="jobs-form" onSubmit={(event) => { void handleCreate(event); }}>
           <h3>创建招聘任务</h3>
           <div className="form-group">
             <label htmlFor="job-title">任务名称</label>
@@ -147,7 +148,7 @@ export default function AdminJobsPage() {
           <button className="start-button" type="submit" disabled={saving || !form.title.trim() || !form.position.trim() || !form.requirements.trim()}>
             {saving ? "正在创建..." : "＋ 创建招聘任务"}
           </button>
-        </form>
+        </form>}
 
         {error && <p className="error" role="alert">{error}</p>}
         {notice && <p className="jobs-notice" role="status">{notice}</p>}
@@ -168,15 +169,15 @@ export default function AdminJobsPage() {
                 </span>
               </div>
               <p className="jobs-requirements">{job.requirements}</p>
-              <div className="jobs-url">{`${window.location.origin}${job.invite_path}`}</div>
-              <div className="jobs-actions">
+              {!demoMode && <div className="jobs-url">{`${window.location.origin}${job.invite_path}`}</div>}
+              {!demoMode && <div className="jobs-actions">
                 <button type="button" className="admin-detail-button" disabled={!job.is_active}
                   onClick={() => { void handleCopy(job); }}>复制邀请链接</button>
                 <button type="button" className="jobs-stop" disabled={!job.is_active || busyJobId !== null}
                   onClick={() => { void handleDeactivate(job); }}>
                   {busyJobId === job.job_id ? "停用中..." : job.is_active ? "停用任务" : "已停用"}
                 </button>
-              </div>
+              </div>}
             </article>
           ))}
         </section>
