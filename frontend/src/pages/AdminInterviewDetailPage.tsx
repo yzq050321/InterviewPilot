@@ -370,26 +370,43 @@ export default function AdminInterviewDetailPage() {
                             )}
                         </div>
                         {evaluation && (
-                            <div className="admin-evaluation-section" style={{ marginTop: 20, marginBottom: 22 }}>
-                                <h4>HR 人工复核（非自动录用决策）</h4>
-                                <p>请综合问答和其他材料进行判断，AI 分数仅供参考。</p>
-                                <div style={{ display: "grid", gap: 12, maxWidth: 700 }}>
-                                    <label htmlFor="hr-review-status">处理状态</label>
-                                    <select id="hr-review-status" value={reviewStatus}
-                                        onChange={(e) => setReviewStatus(e.target.value as ReviewStatus)}>
-                                        {Object.entries(reviewLabels).map(([value, label]) =>
-                                            <option key={value} value={value}>{label}</option>)}
-                                    </select>
-                                    <label htmlFor="hr-review-note">复核备注（不超过 1000 字）</label>
-                                    <textarea id="hr-review-note" rows={4} maxLength={1000} value={reviewNote}
-                                        onChange={(e) => setReviewNote(e.target.value)}
-                                        placeholder="记录需要人工确认的事项，不要填写不必要的个人敏感信息" />
-                                    <button className="admin-detail-button" type="button" disabled={reviewSaving}
-                                        onClick={() => { void handleSaveReview(); }}>
-                                        {reviewSaving ? "正在保存…" : "保存人工复核"}
-                                    </button>
+                            <section className="admin-evaluation-section admin-review-panel" aria-labelledby="admin-review-title">
+                                <div className="admin-review-heading">
+                                    <div>
+                                        <h4 id="admin-review-title">HR 人工复核</h4>
+                                        <p>综合面试问答和其他材料进行判断，AI 评分仅供参考，不代表自动录用结果。</p>
+                                    </div>
+                                    <span className="admin-review-tag">仅 HR 可见</span>
                                 </div>
-                            </div>
+                                <div className="admin-review-form">
+                                    <div className="admin-review-field">
+                                        <label htmlFor="hr-review-status">处理状态</label>
+                                        <select id="hr-review-status" value={reviewStatus}
+                                            disabled={reviewSaving}
+                                            onChange={(e) => setReviewStatus(e.target.value as ReviewStatus)}>
+                                            {Object.entries(reviewLabels).map(([value, label]) =>
+                                                <option key={value} value={value}>{label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="admin-review-field">
+                                        <label htmlFor="hr-review-note">复核备注</label>
+                                        <textarea id="hr-review-note" rows={4} maxLength={1000} value={reviewNote}
+                                            disabled={reviewSaving}
+                                            onChange={(e) => setReviewNote(e.target.value)}
+                                            placeholder="记录需要人工确认的事项，不要填写不必要的个人敏感信息" />
+                                    </div>
+                                    <div className="admin-review-footer">
+                                        <span className="admin-review-counter">{reviewNote.length} / 1000 字</span>
+                                        <button className="admin-review-save-button" type="button" disabled={reviewSaving}
+                                            onClick={() => { void handleSaveReview(); }}>
+                                            {reviewSaving ? "正在保存…" : "保存人工复核"}
+                                        </button>
+                                    </div>
+                                    {workflowNotice.includes("人工复核已保存") && (
+                                        <p className="admin-review-success" role="status">✓ 已保存，刷新页面后仍可查看。</p>
+                                    )}
+                                </div>
+                            </section>
                         )}
                         <div className="admin-qa-header">
                             <div>

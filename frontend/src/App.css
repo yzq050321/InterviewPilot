@@ -1355,3 +1355,198 @@
   .jobs-form { padding: 16px; }
   .jobs-page { padding: 20px; }
 }
+
+
+/* ===== V2 第六批：HR 工作流视觉统一（仅影响后台） ===== */
+.admin-dashboard .workflow-filters {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.35fr) repeat(3, minmax(138px, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 20px;
+  margin-bottom: 22px;
+  background: linear-gradient(125deg, #fafaff 0%, #f7f7ff 100%);
+  border: 1px solid #e7e5fa;
+  border-radius: 16px;
+}
+
+.admin-dashboard .workflow-filter-field,
+.admin-dashboard .admin-review-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-dashboard .workflow-filter-field > span,
+.admin-dashboard .admin-review-field > label {
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: #5c6381;
+}
+
+.admin-dashboard .workflow-filter-field input,
+.admin-dashboard .workflow-filter-field select,
+.admin-dashboard .admin-review-field select,
+.admin-dashboard .admin-review-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 13px;
+  border: 1px solid #dce0f2;
+  border-radius: 11px;
+  background: #fff;
+  color: #293854;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 1px 2px rgba(70, 65, 140, 0.04);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+
+.admin-dashboard .workflow-filter-field input::placeholder,
+.admin-dashboard .admin-review-field textarea::placeholder { color: #929ab3; }
+
+.admin-dashboard .workflow-filter-field :is(input, select):focus,
+.admin-dashboard .admin-review-field :is(select, textarea):focus {
+  outline: none;
+  border-color: #7663ec;
+  box-shadow: 0 0 0 3px rgba(113, 91, 234, 0.13);
+}
+
+.admin-dashboard .workflow-reset-button {
+  height: 44px;
+  padding: 0 16px;
+  white-space: nowrap;
+  color: #5948cf;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid #d9d1ff;
+  background: #fff;
+  border-radius: 11px;
+  transition: background .2s ease, border-color .2s ease;
+}
+.admin-dashboard .workflow-reset-button:hover:not(:disabled) { background: #efecff; border-color: #ab9af6; }
+.admin-dashboard .workflow-reset-button:disabled { opacity: .5; cursor: not-allowed; }
+
+.admin-dashboard .admin-table-scroll {
+  overflow-x: auto;
+  border: 1px solid #e8eaf7;
+  border-radius: 14px;
+}
+.admin-dashboard .admin-interviews-table { width: 100%; min-width: 850px; border-collapse: collapse; text-align: left; }
+.admin-dashboard .admin-interviews-table th:first-child { border-top-left-radius: 13px; }
+.admin-dashboard .admin-interviews-table th:last-child { border-top-right-radius: 13px; }
+.admin-dashboard .admin-interviews-table tbody tr:last-child td { border-bottom: 0; }
+
+.admin-dashboard .workflow-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: #646b86;
+  background: #f2f3fa;
+}
+.admin-dashboard .workflow-status-pill:is(.is-complete, .eval-ready, .review-reviewed) {
+  color: #087b55;
+  background: #ddf9ee;
+}
+.admin-dashboard .workflow-status-pill:is(.is-progress, .eval-generating, .review-follow_up) {
+  color: #875309;
+  background: #fff2d9;
+}
+.admin-dashboard .workflow-status-pill.eval-failed { color: #bb303f; background: #fff0ef; }
+.admin-dashboard .workflow-status-pill.eval-pending { color: #5b4bba; background: #f0ecff; }
+
+.admin-dashboard .admin-review-panel {
+  margin: 24px 0;
+  padding: 26px;
+  border-radius: 17px;
+  border: 1px solid #e0dcff;
+  border-left: 4px solid #7663ec;
+  background: linear-gradient(125deg, #fbfaff 0%, #f6f5ff 100%);
+}
+.admin-dashboard .admin-review-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.admin-dashboard .admin-review-heading h4 { margin: 0 0 8px; font-size: 17px; color: #25264e; }
+.admin-dashboard .admin-review-heading p { margin: 0; color: #64708b; font-size: 13px; line-height: 1.75; }
+.admin-dashboard .admin-review-tag {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 6px 11px;
+  border: 1px solid #ded6ff;
+  border-radius: 999px;
+  background: #efecff;
+  color: #6a4bd8;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.admin-dashboard .admin-review-form { display: grid; gap: 17px; max-width: 740px; }
+.admin-dashboard .admin-review-field select { max-width: 340px; }
+.admin-dashboard .admin-review-field textarea {
+  min-height: 126px;
+  height: auto;
+  resize: vertical;
+  padding: 13px 15px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.admin-dashboard .admin-review-footer { display: flex; gap: 14px; align-items: center; justify-content: space-between; }
+.admin-dashboard .admin-review-counter { font-size: 12px; color: #7a819a; }
+.admin-dashboard .admin-review-save-button {
+  min-height: 44px;
+  padding: 11px 22px;
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(100deg, #574bea, #8b50ee);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(97, 75, 226, .16);
+  transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease;
+}
+.admin-dashboard .admin-review-save-button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 9px 18px rgba(97, 75, 226, .24); }
+.admin-dashboard .admin-review-save-button:disabled { cursor: not-allowed; opacity: .6; }
+.admin-dashboard .admin-review-success {
+  margin: 0;
+  padding: 11px 14px;
+  border: 1px solid #b9e9d3;
+  border-radius: 10px;
+  color: #116e50;
+  background: #e9faf2;
+  font-size: 13px;
+}
+.admin-dashboard .workflow-filter-field :is(input, select):focus-visible,
+.admin-dashboard .workflow-reset-button:focus-visible,
+.admin-dashboard .admin-review-save-button:focus-visible {
+  outline: 3px solid rgba(103, 79, 228, 0.3);
+  outline-offset: 2px;
+}
+@media (max-width: 1100px) {
+  .admin-dashboard .workflow-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .admin-dashboard .workflow-filters { grid-template-columns: minmax(0, 1fr); padding: 15px; }
+  .admin-dashboard .admin-review-panel { padding: 19px 15px; }
+  .admin-dashboard .admin-review-heading { flex-direction: column; gap: 10px; }
+  .admin-dashboard .admin-review-footer { align-items: stretch; flex-direction: column; }
+  .admin-dashboard .admin-review-save-button { width: 100%; }
+  .admin-dashboard .admin-review-field select { max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-dashboard .admin-review-save-button,
+  .admin-dashboard .workflow-reset-button { transition: none; }
+}

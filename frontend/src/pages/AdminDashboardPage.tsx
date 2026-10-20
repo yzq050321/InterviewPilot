@@ -183,34 +183,46 @@ export default function AdminDashboardPage() {
                             </div>
                         </div>
                         <h3>候选人面试列表（符合筛选 {visibleInterviews.length} / {interviews.length} 场）</h3>
-                        <div className="workflow-filters" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
-                            <input aria-label="按姓名、岗位或编号筛选" placeholder="搜索姓名、岗位或面试编号" value={keyword}
-                                onChange={(event) => setKeyword(event.target.value)} style={{ minWidth: 195, padding: 10 }} />
-                            <select aria-label="面试状态筛选" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                                <option value="all">全部面试状态</option>
-                                <option value="in_progress">进行中</option><option value="completed">已完成</option>
-                            </select>
-                            <select aria-label="评估状态筛选" value={reportFilter} onChange={(event) => setReportFilter(event.target.value)}>
-                                <option value="all">全部评估状态</option>
-                                {Object.entries(evaluationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                            </select>
-                            <select aria-label="复核状态筛选" value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value)}>
-                                <option value="all">全部人工复核状态</option>
-                                {Object.entries(reviewLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                            </select>
+                        <div className="workflow-filters" role="search" aria-label="筛选候选人面试">
+                            <label className="workflow-filter-field workflow-filter-keyword">
+                                <span>姓名 / 岗位 / 编号</span>
+                                <input aria-label="按姓名、岗位或编号筛选" placeholder="搜索候选人或面试编号" value={keyword}
+                                    onChange={(event) => setKeyword(event.target.value)} />
+                            </label>
+                            <label className="workflow-filter-field">
+                                <span>面试状态</span>
+                                <select aria-label="面试状态筛选" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                                    <option value="all">全部面试状态</option>
+                                    <option value="in_progress">进行中</option>
+                                    <option value="completed">已完成</option>
+                                </select>
+                            </label>
+                            <label className="workflow-filter-field">
+                                <span>评估状态</span>
+                                <select aria-label="评估状态筛选" value={reportFilter} onChange={(event) => setReportFilter(event.target.value)}>
+                                    <option value="all">全部评估状态</option>
+                                    {Object.entries(evaluationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                                </select>
+                            </label>
+                            <label className="workflow-filter-field">
+                                <span>人工复核</span>
+                                <select aria-label="复核状态筛选" value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value)}>
+                                    <option value="all">全部人工复核状态</option>
+                                    {Object.entries(reviewLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                                </select>
+                            </label>
+                            <button type="button" className="workflow-reset-button"
+                                disabled={!keyword && statusFilter === "all" && reportFilter === "all" && reviewFilter === "all"}
+                                onClick={() => {
+                                    setKeyword(""); setStatusFilter("all"); setReportFilter("all"); setReviewFilter("all");
+                                }}>重置筛选</button>
                         </div>
 
                         {visibleInterviews.length === 0 ? (
                             <p>{interviews.length === 0 ? "暂无候选人面试记录。" : "当前筛选条件下没有面试记录。"}</p>
                         ) : (
-                            <div style={{ overflowX: "auto" }}>
-                                <table
-                                    style={{
-                                        width: "100%",
-                                        borderCollapse: "collapse",
-                                        textAlign: "left",
-                                    }}
-                                >
+                            <div className="admin-table-scroll">
+                                <table className="admin-interviews-table">
                                     <thead>
                                         <tr>
                                             <th>面试编号</th>
@@ -231,12 +243,16 @@ export default function AdminDashboardPage() {
                                                 <td>{interview.candidate_name || "未填写"}</td>
                                                 <td>{interview.position}</td>
                                                 <td>
-                                                    {interview.status === "completed"
-                                                        ? "已完成"
-                                                        : "进行中"}
+                                                    <span className={`workflow-status-pill ${interview.status === "completed" ? "is-complete" : "is-progress"}`}>
+                                                        {interview.status === "completed" ? "已完成" : "进行中"}
+                                                    </span>
                                                 </td>
-                                                <td>{evaluationLabels[interview.evaluation_status] || "—"}</td>
-                                                <td>{reviewLabels[interview.review_status] || "待人工复核"}</td>
+                                                <td><span className={`workflow-status-pill eval-${interview.evaluation_status}`}>
+                                                    {evaluationLabels[interview.evaluation_status] || "—"}
+                                                </span></td>
+                                                <td><span className={`workflow-status-pill review-${interview.review_status}`}>
+                                                    {reviewLabels[interview.review_status] || "待人工复核"}
+                                                </span></td>
                                                 <td>
                                                     {interview.created_at
                                                         ? interview.created_at.replace("T", " ").slice(0, 19)
