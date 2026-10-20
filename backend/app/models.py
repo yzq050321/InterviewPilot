@@ -67,6 +67,16 @@ class Interview(Base):
         nullable=False
     )
 
+    # AI 报告状态：pending / generating / failed / ready；旧记录为 NULL。
+    evaluation_state: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    evaluation_error: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    evaluation_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # HR 人工复核：pending / reviewed / follow_up（不自动录用或淘汰）。
+    review_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     # 一场面试对应多条消息
     messages: Mapped[list["Message"]] = relationship(
         back_populates="interview",

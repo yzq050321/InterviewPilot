@@ -45,6 +45,8 @@ from app.login_limiter import (
 
 from app.job_routes import router as job_router
 from app.structured_interview import stage_after_answer, CLOSING_MESSAGE, QUESTION_LIMIT
+from app.admin_workflow import router as admin_workflow_router
+from app.evaluation_workflow import get_evaluation_state, generate_and_store_report
 
 # 创建 FastAPI 应用
 app = FastAPI(
@@ -53,6 +55,7 @@ app = FastAPI(
 )
 
 app.include_router(job_router)
+app.include_router(admin_workflow_router)
 
 candidate_bearer = HTTPBearer(auto_error=False)
 
@@ -445,6 +448,9 @@ def list_interviews(
         .all()
     )
 
+    # 批量确认报告是否存在，避免 N+1 查询及旧数据状态不准确。
+    report_ids = set(db.scalars(select(Evaluation.interview_id)).all())
+
     # 2. 转换为 JSON 可序列化的数据
     result = []
 
@@ -457,6 +463,9 @@ def list_interviews(
             "position": interview.position,
             "difficulty": interview.difficulty,
             "status": interview.status,
+            "job_id": interview.job_id,
+            "evaluation_status": get_evaluation_state(interview, interview.id in report_ids),
+            "review_status": interview.review_status,
             "created_at": interview.created_at
         })
 
@@ -501,6 +510,8 @@ def get_admin_interview(
             "created_at": message.created_at,
         })
 
+    has_report = db.scalar(select(Evaluation.id).where(Evaluation.interview_id == interview_id)) is not None
+
     # 4. 返回面试信息和完整问答
     return {
         "interview_id": interview.id,
@@ -508,6 +519,12 @@ def get_admin_interview(
         "position": interview.position,
         "difficulty": interview.difficulty,
         "status": interview.status,
+        "job_id": interview.job_id,
+        "evaluation_status": get_evaluation_state(interview, has_report),
+        "evaluation_error": interview.evaluation_error if not has_report else None,
+        "review_status": interview.review_status,
+        "review_note": interview.review_note,
+        "reviewed_at": interview.reviewed_at,
         "created_at": interview.created_at,
         "messages": message_list,
     }
@@ -709,111 +726,8 @@ async def create_interview_evaluation(
                 detail="请先结束面试，再生成评估报告"
             )
 
-        # 检查是否已有评估报告
-        existing = db.scalar(
-            select(Evaluation).where(
-                Evaluation.interview_id == interview_id
-            )
-        )
-
-        if existing is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="该面试已有评估报告"
-            )
-
-        # 读取面试历史
-        messages = db.scalars(
-            select(Message)
-            .where(Message.interview_id == interview_id)
-            .order_by(Message.id.asc())
-        ).all()
-
-        history = [
-            {
-                "role": msg.role,
-                "content": msg.content
-            }
-            for msg in messages
-        ]
-
-        position = interview.position
-        difficulty = interview.difficulty
-        job = db.get(JobPosting, interview.job_id) if interview.job_id is not None else None
-        job_requirements = job.requirements if job is not None else None
-        structured_interview = interview.job_id is not None
-
-    # 第二步：检查是否有用户回答
-    if not any(msg["role"] == "user" for msg in history):
-        raise HTTPException(
-            status_code=400,
-            detail="面试没有用户回答，无法生成报告"
-        )
-
-    # 第三步：调用 AI
-    try:
-        report_kwargs = {
-            "position": position,
-            "difficulty": difficulty,
-            "history": history,
-        }
-        if job_requirements:
-            report_kwargs["requirements"] = job_requirements
-        if structured_interview:
-            report_kwargs["structured"] = True
-        report = await run_in_threadpool(generate_evaluation, **report_kwargs)
-    except Exception:
-        raise HTTPException(
-            status_code=502,
-            detail="AI 评估生成失败，请稍后重试"
-        )
-
-    # 第四步：保存评估报告
-    with SessionLocal() as db:
-
-        # AI 调用期间可能已有其他请求生成报告
-        existing = db.scalar(
-            select(Evaluation).where(
-                Evaluation.interview_id == interview_id
-            )
-        )
-
-        if existing is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="该面试已有评估报告"
-            )
-
-        evaluation = Evaluation(
-            interview_id=interview_id,
-            technical_score=report.technical_score,
-            completeness_score=report.completeness_score,
-            clarity_score=report.clarity_score,
-            overall_score=report.overall_score,
-            summary=report.summary,
-            strengths=report.strengths,
-            weaknesses=report.weaknesses,
-            suggestions=report.suggestions,
-            competency_assessment=getattr(report, "competency_assessment", None),
-        )
-
-        try:
-            db.add(evaluation)
-            db.commit()
-            db.refresh(evaluation)
-        except Exception:
-            db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="评估报告保存失败"
-            )
-
-        return {
-            "evaluation_id": evaluation.id,
-            "interview_id": evaluation.interview_id,
-            # 候选人接口只确认报告已生成，不返回 HR 专用的分数。
-            "message": "评估报告生成成功"
-        }
-
-
-
+    # 与 HR 恢复入口共用一次原子领取、模型调用和报告保存流程。
+    # 返回结果不含任何 HR 评分或报告内容。
+    return await generate_and_store_report(
+        interview_id, session_factory=SessionLocal, generator=generate_evaluation
+    )

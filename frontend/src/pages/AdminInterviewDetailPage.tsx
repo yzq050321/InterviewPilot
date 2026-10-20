@@ -5,6 +5,10 @@ import {
     getAdminInterviewDetail,
     getAdminInterviewEvaluation,
 } from "../services/api";
+import {
+    retryEvaluation, updateInterviewReview, evaluationLabels, reviewLabels,
+} from "../services/adminWorkflowApi";
+import type { ReviewStatus } from "../services/adminWorkflowApi";
 
 type AdminInterviewDetail = Awaited<
     ReturnType<typeof getAdminInterviewDetail>
@@ -75,6 +79,12 @@ export default function AdminInterviewDetailPage() {
     const [evaluationError, setEvaluationError] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [retrying, setRetrying] = useState(false);
+    const [reviewSaving, setReviewSaving] = useState(false);
+    const [reviewNote, setReviewNote] = useState("");
+    const [reviewStatus, setReviewStatus] = useState<ReviewStatus>("pending");
+    const [workflowNotice, setWorkflowNotice] = useState("");
+    const [workflowError, setWorkflowError] = useState("");
 
     useEffect(() => {
         let cancelled = false;
@@ -99,6 +109,8 @@ export default function AdminInterviewDetailPage() {
                 if (cancelled) return;
 
                 setInterview(data);
+                setReviewNote(data.review_note || "");
+                setReviewStatus(data.review_status || "pending");
 
                 // 2. 如果面试已经完成，再读取 AI 评估报告
                 setEvaluation(null);
@@ -157,6 +169,46 @@ export default function AdminInterviewDetailPage() {
             cancelled = true;
         };
     }, [id]);
+
+    async function handleRetry() {
+        if (!interview || retrying || interview.status !== "completed" || evaluation) return;
+        setRetrying(true);
+        setWorkflowError("");
+        setWorkflowNotice("正在生成报告，请勿重复点击；此操作可能需要几十秒。");
+        try {
+            await retryEvaluation(interview.interview_id);
+            const [fresh, report] = await Promise.all([
+                getAdminInterviewDetail(interview.interview_id),
+                getAdminInterviewEvaluation(interview.interview_id),
+            ]);
+            setInterview(fresh);
+            setEvaluation(report);
+            setEvaluationError("");
+            setWorkflowNotice("AI 评估已恢复，请 HR 继续人工复核。");
+        } catch (err) {
+            setWorkflowError(err instanceof Error ? err.message : "恢复报告失败");
+            // 再次查询持久化状态，不触发 AI，也不丢失原问答。
+            try { setInterview(await getAdminInterviewDetail(interview.interview_id)); } catch { /* keep existing */ }
+        } finally {
+            setRetrying(false);
+        }
+    }
+
+    async function handleSaveReview() {
+        if (!interview || !evaluation || reviewSaving) return;
+        setReviewSaving(true);
+        setWorkflowError("");
+        setWorkflowNotice("");
+        try {
+            const saved = await updateInterviewReview(interview.interview_id, reviewStatus, reviewNote);
+            setInterview((prev) => prev ? { ...prev, ...saved } : prev);
+            setWorkflowNotice("人工复核已保存。此状态不代表自动录用或淘汰。");
+        } catch (err) {
+            setWorkflowError(err instanceof Error ? err.message : "复核保存失败");
+        } finally {
+            setReviewSaving(false);
+        }
+    }
 
     function handleBack() {
         navigate("/admin");
@@ -240,6 +292,23 @@ export default function AdminInterviewDetailPage() {
 
                         <div className="admin-evaluation">
                             <h3>AI 面试评估报告</h3>
+                            <p style={{ color: "#566582", marginBottom: 12 }}>
+                                评估状态：{evaluationLabels[interview.evaluation_status] || "待生成报告"}
+                                {interview.evaluation_status === "failed" && interview.evaluation_error
+                                    ? ` · ${interview.evaluation_error}` : ""}
+                            </p>
+                            {workflowNotice && <p role="status" style={{ color: "#3c4e90" }}>{workflowNotice}</p>}
+                            {workflowError && <p className="error" role="alert">{workflowError}</p>}
+                            {interview.status === "completed" && !evaluation &&
+                                interview.evaluation_status !== "generating" && !evaluationLoading && (
+                                <button type="button" className="admin-detail-button" disabled={retrying}
+                                    onClick={() => { void handleRetry(); }} style={{ marginBottom: 16 }}>
+                                    {retrying ? "正在恢复 AI 报告…" : "重新生成 AI 评估报告"}
+                                </button>
+                            )}
+                            {interview.evaluation_status === "generating" && !retrying && (
+                                <p>报告正在生成，请稍后刷新页面。生成超过 15 分钟后允许重试。</p>
+                            )}
 
                             {interview.status !== "completed" ? (
                                 <p>面试尚未结束，暂无评估报告。</p>
@@ -300,6 +369,28 @@ export default function AdminInterviewDetailPage() {
                                 <p>暂无 AI 评估报告。</p>
                             )}
                         </div>
+                        {evaluation && (
+                            <div className="admin-evaluation-section" style={{ marginTop: 20, marginBottom: 22 }}>
+                                <h4>HR 人工复核（非自动录用决策）</h4>
+                                <p>请综合问答和其他材料进行判断，AI 分数仅供参考。</p>
+                                <div style={{ display: "grid", gap: 12, maxWidth: 700 }}>
+                                    <label htmlFor="hr-review-status">处理状态</label>
+                                    <select id="hr-review-status" value={reviewStatus}
+                                        onChange={(e) => setReviewStatus(e.target.value as ReviewStatus)}>
+                                        {Object.entries(reviewLabels).map(([value, label]) =>
+                                            <option key={value} value={value}>{label}</option>)}
+                                    </select>
+                                    <label htmlFor="hr-review-note">复核备注（不超过 1000 字）</label>
+                                    <textarea id="hr-review-note" rows={4} maxLength={1000} value={reviewNote}
+                                        onChange={(e) => setReviewNote(e.target.value)}
+                                        placeholder="记录需要人工确认的事项，不要填写不必要的个人敏感信息" />
+                                    <button className="admin-detail-button" type="button" disabled={reviewSaving}
+                                        onClick={() => { void handleSaveReview(); }}>
+                                        {reviewSaving ? "正在保存…" : "保存人工复核"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                         <div className="admin-qa-header">
                             <div>
                                 <h3>完整面试问答</h3>

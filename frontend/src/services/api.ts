@@ -301,6 +301,9 @@ export async function getAdminInterviews(): Promise<
     position: string;
     difficulty: string;
     status: string;
+    job_id: number | null;
+    evaluation_status: import("./adminWorkflowApi").EvaluationStatus;
+    review_status: import("./adminWorkflowApi").ReviewStatus;
     created_at: string;
   }[]
 > {
@@ -343,13 +346,14 @@ export async function getAdminInterviewDetail(
   position: string;
   difficulty: string;
   status: string;
+  job_id: number | null;
+  evaluation_status: import("./adminWorkflowApi").EvaluationStatus;
+  evaluation_error: string | null;
+  review_status: import("./adminWorkflowApi").ReviewStatus;
+  review_note: string | null;
+  reviewed_at: string | null;
   created_at: string;
-  messages: {
-    id: number;
-    role: string;
-    content: string;
-    created_at: string;
-  }[];
+  messages: { id: number; role: string; content: string; created_at: string }[];
 }> {
   const token = sessionStorage.getItem("admin_token");
 

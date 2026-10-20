@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAdminInterviews } from "../services/api";
+import { evaluationLabels, reviewLabels } from "../services/adminWorkflowApi";
+import type { EvaluationStatus, ReviewStatus } from "../services/adminWorkflowApi";
 
 type AdminInterview = {
     interview_id: number;
@@ -10,12 +12,27 @@ type AdminInterview = {
     difficulty: string;
     status: string;
     created_at: string;
+    job_id: number | null;
+    evaluation_status: EvaluationStatus;
+    review_status: ReviewStatus;
 };
 
 export default function AdminDashboardPage() {
     const navigate = useNavigate();
 
     const [interviews, setInterviews] = useState<AdminInterview[]>([]);
+    const [keyword, setKeyword] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [reportFilter, setReportFilter] = useState("all");
+    const [reviewFilter, setReviewFilter] = useState("all");
+    const visibleInterviews = interviews.filter((item) => {
+        const matchKeyword = `${item.candidate_name || ""} ${item.position} ${item.interview_id}`
+            .toLowerCase().includes(keyword.trim().toLowerCase());
+        return matchKeyword
+            && (statusFilter === "all" || item.status === statusFilter)
+            && (reportFilter === "all" || item.evaluation_status === reportFilter)
+            && (reviewFilter === "all" || item.review_status === reviewFilter);
+    });
 
     const totalCount = interviews.length;
 
@@ -165,10 +182,26 @@ export default function AdminDashboardPage() {
                                 <span>尚未结束的面试</span>
                             </div>
                         </div>
-                        <h3>候选人面试列表（共 {interviews.length} 场）</h3>
+                        <h3>候选人面试列表（符合筛选 {visibleInterviews.length} / {interviews.length} 场）</h3>
+                        <div className="workflow-filters" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
+                            <input aria-label="按姓名、岗位或编号筛选" placeholder="搜索姓名、岗位或面试编号" value={keyword}
+                                onChange={(event) => setKeyword(event.target.value)} style={{ minWidth: 195, padding: 10 }} />
+                            <select aria-label="面试状态筛选" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                                <option value="all">全部面试状态</option>
+                                <option value="in_progress">进行中</option><option value="completed">已完成</option>
+                            </select>
+                            <select aria-label="评估状态筛选" value={reportFilter} onChange={(event) => setReportFilter(event.target.value)}>
+                                <option value="all">全部评估状态</option>
+                                {Object.entries(evaluationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                            </select>
+                            <select aria-label="复核状态筛选" value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value)}>
+                                <option value="all">全部人工复核状态</option>
+                                {Object.entries(reviewLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                            </select>
+                        </div>
 
-                        {interviews.length === 0 ? (
-                            <p>暂无候选人面试记录。</p>
+                        {visibleInterviews.length === 0 ? (
+                            <p>{interviews.length === 0 ? "暂无候选人面试记录。" : "当前筛选条件下没有面试记录。"}</p>
                         ) : (
                             <div style={{ overflowX: "auto" }}>
                                 <table
@@ -183,14 +216,16 @@ export default function AdminDashboardPage() {
                                             <th>面试编号</th>
                                             <th>候选人</th>
                                             <th>应聘岗位</th>
-                                            <th>状态</th>
+                                            <th>面试状态</th>
+                                            <th>评估状态</th>
+                                            <th>人工复核</th>
                                             <th>面试时间</th>
                                             <th>操作</th>
                                         </tr>
                                     </thead>
 
                                     <tbody>
-                                        {interviews.map((interview) => (
+                                        {visibleInterviews.map((interview) => (
                                             <tr key={interview.interview_id}>
                                                 <td>{interview.interview_id}</td>
                                                 <td>{interview.candidate_name || "未填写"}</td>
@@ -200,6 +235,8 @@ export default function AdminDashboardPage() {
                                                         ? "已完成"
                                                         : "进行中"}
                                                 </td>
+                                                <td>{evaluationLabels[interview.evaluation_status] || "—"}</td>
+                                                <td>{reviewLabels[interview.review_status] || "待人工复核"}</td>
                                                 <td>
                                                     {interview.created_at
                                                         ? interview.created_at.replace("T", " ").slice(0, 19)
