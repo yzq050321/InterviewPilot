@@ -1,5 +1,5 @@
 /** InterviewPilot V2 招聘任务接口。生产环境沿用当前 HTTPS 域名访问 /api。 */
-const API_BASE = import.meta.env.DEV ? "http://127.0.0.1:8000" : "";
+const API_BASE = "";
 
 export type Difficulty = "简单" | "中等" | "困难";
 

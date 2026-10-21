@@ -1,5 +1,5 @@
 import type { InterviewDetail } from "../types/interview";
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "";
 
 /**
  * 获取历史面试记录

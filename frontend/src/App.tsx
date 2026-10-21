@@ -18,18 +18,23 @@ import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminInterviewDetailPage from "./pages/AdminInterviewDetailPage";
 import AdminJobsPage from "./pages/AdminJobsPage";
+import AdminJobDetailPage from "./pages/AdminJobDetailPage";
 import JobInvitationPage from "./pages/JobInvitationPage";
 import type { InvitedInterview, Difficulty } from "./services/jobApi";
 import {
   Link,
+  NavLink,
   Route,
   Routes,
   useNavigate,
   useMatch,
+  useLocation,
 } from "react-router-dom";
 
 function App() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const showHrDock = location.pathname.startsWith("/admin") && location.pathname !== "/admin/login" && Boolean(sessionStorage.getItem("admin_token"));
   const interviewMatch = useMatch("/interview/:id");
   const routeInterviewId = interviewMatch?.params.id;
   const chatRef = useRef<HTMLElement | null>(null);
@@ -362,6 +367,7 @@ function App() {
           />
 
           <Route path="/admin/jobs" element={<AdminJobsPage />} />
+          <Route path="/admin/jobs/:jobId" element={<AdminJobDetailPage />} />
           <Route path="/invite/:inviteCode" element={<JobInvitationPage onStarted={handleInvitationStarted} />} />
 
           <Route
@@ -432,6 +438,10 @@ function App() {
           
         </Routes>
       </main>
+      {showHrDock && <nav className="hr-mobile-dock" aria-label="招聘后台快捷导航">
+        <NavLink to="/admin/jobs" className={({ isActive }) => isActive ? "active" : ""}>▣<span>岗位</span></NavLink>
+        <NavLink to="/admin" end className={({ isActive }) => isActive ? "active" : ""}>☷<span>全部面试</span></NavLink>
+      </nav>}
     </div>
   );
 }

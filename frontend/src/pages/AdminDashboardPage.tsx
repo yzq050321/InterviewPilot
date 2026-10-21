@@ -241,27 +241,27 @@ export default function AdminDashboardPage() {
                                     <tbody>
                                         {visibleInterviews.map((interview) => (
                                             <tr key={interview.interview_id}>
-                                                <td>{interview.interview_id}</td>
-                                                <td>{interview.candidate_name || "未填写"}</td>
-                                                <td>{interview.position}</td>
-                                                <td>
+                                                <td data-label="面试编号">{interview.interview_id}</td>
+                                                <td data-label="候选人">{interview.candidate_name || "未填写"}</td>
+                                                <td data-label="应聘岗位">{interview.position}</td>
+                                                <td data-label="面试状态">
                                                     <span className={`workflow-status-pill ${interview.status === "completed" ? "is-complete" : "is-progress"}`}>
                                                         {interview.status === "completed" ? "已完成" : "进行中"}
                                                     </span>
                                                 </td>
-                                                <td><span className={`workflow-status-pill eval-${interview.evaluation_status}`}>
+                                                <td data-label="评估状态"><span className={`workflow-status-pill eval-${interview.evaluation_status}`}>
                                                     {evaluationLabels[interview.evaluation_status] || "—"}
                                                 </span></td>
-                                                <td><span className={`workflow-status-pill review-${interview.review_status}`}>
+                                                <td data-label="人工复核"><span className={`workflow-status-pill review-${interview.review_status}`}>
                                                     {reviewLabels[interview.review_status] || "待人工复核"}
                                                 </span></td>
-                                                <td>
+                                                <td data-label="面试时间">
                                                     {interview.created_at
                                                         ? interview.created_at.replace("T", " ").slice(0, 19)
                                                         : "—"}
                                                 </td>
 
-                                                <td>
+                                                <td data-label="操作">
                                                     <button
                                                         type="button"
                                                         className="admin-detail-button"

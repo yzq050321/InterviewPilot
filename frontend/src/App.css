@@ -1550,3 +1550,117 @@
   .admin-dashboard .admin-review-save-button,
   .admin-dashboard .workflow-reset-button { transition: none; }
 }
+
+/* ===== V2.1 Batch 8: HR job workspace, detail and mobile usability ===== */
+.hr-workspace { max-width: 1180px; margin: 0 auto; min-width: 0; }
+.hr-workspace-panel { min-width: 0; }
+.hr-workspace-nav { display: flex; gap: 8px; padding: 0 0 16px; }
+.hr-workspace-nav a { text-decoration: none; color: #565c78; padding: 10px 15px; border-radius: 10px; font-size: 14px; font-weight: 650; }
+.hr-workspace-nav a.is-current { background: #ebe8ff; color: #5e42e1; }
+.hr-workspace-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding-bottom: 22px; border-bottom: 1px solid #edf0f7; }
+.hr-workspace-heading > div:first-child { min-width: 0; }
+.hr-workspace-heading h2 { color: #202840; margin: 8px 0; overflow-wrap: anywhere; }
+.hr-workspace-heading p, .hr-eyebrow { color: #6a7187; font-size: 13px; line-height: 1.7; }
+.hr-eyebrow { font-weight: 650; color: #6c56db; }
+.hr-primary-btn { background: linear-gradient(100deg,#5b4dea,#7b37e5); color: white; border: 0; border-radius: 11px; padding: 12px 19px; font-weight: 700; cursor: pointer; min-height: 44px; flex-shrink: 0; }
+.hr-primary-btn:disabled { opacity: .5; cursor: not-allowed; }
+.hr-workspace-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 22px 0 26px; }
+.hr-workspace-stats > div { padding: 18px; border: 1px solid #e8e7f8; background: #f8f7ff; border-radius: 15px; min-width: 0; }
+.hr-workspace-stats strong { display: block; font-size: 28px; line-height: 1.25; color: #252a4f; }
+.hr-workspace-stats span { display: block; margin-top: 6px; font-size: 12px; color: #636b85; }
+.hr-create-form { margin: 20px 0; }
+.hr-template-row { display: flex; flex-wrap: wrap; gap: 9px; margin: 13px 0 22px; }
+.hr-template-row button { border: 1px solid #d9d6ff; background: white; color: #5a4dc7; border-radius: 9px; padding: 10px 14px; min-height: 44px; cursor: pointer; }
+.hr-template-row button:hover { background: #f0edff; }
+.hr-form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 16px; }
+.hr-workspace .form-group input { width: 100%; }
+.hr-workspace .jobs-form .hr-primary-btn { width: 100%; }
+.hr-job-list { margin-top: 16px; }
+.hr-list-title { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.hr-list-title h3 { margin: 14px 0; }
+.hr-list-title > span { font-size: 13px; color: #707994; }
+.hr-workspace-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 10px 0 18px; }
+.hr-workspace-filters > input { min-width: min(100%, 245px); flex: 1; padding: 12px 14px; border: 1px solid #dfe3f1; border-radius: 11px; background: #fff; color: #263452; min-height: 44px; }
+.hr-filter-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.hr-filter-buttons button { min-height: 40px; padding: 8px 13px; background: white; border: 1px solid #e3e2f2; border-radius: 999px; color: #667089; cursor: pointer; }
+.hr-filter-buttons button.is-selected { color: #fff; border-color: #6650e6; background: #6650e6; }
+.hr-job-cards { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.hr-job-card { min-width: 0; padding: 20px; background: white; border: 1px solid #e8e6fb; border-radius: 15px; }
+.hr-job-head, .hr-job-head > div { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.hr-job-head { justify-content: space-between; }
+.hr-job-head h4 { margin: 0; font-size: 17px; overflow-wrap: anywhere; color: #22274d; }
+.hr-job-status { flex-shrink: 0; color: #68728a; font-size: 12px; }
+.hr-status-dot { flex-shrink: 0; background: #16986a; border-radius: 50%; width: 9px; height: 9px; }
+.hr-status-dot.is-inactive { background: #a6acb8; }
+.hr-job-meta { margin: 9px 0 14px; color: #6c748d; font-size: 12px; overflow-wrap: anywhere; }
+.hr-job-metrics { display: flex; flex-wrap: wrap; gap: 7px; }
+.hr-job-metrics span { padding: 6px 9px; border-radius: 7px; background: #f2f0fc; color: #514880; font-size: 12px; }
+.hr-job-metrics .hr-alert-metric { color: #b43444; background: #fff1f1; }
+.hr-job-card-foot { display: flex; gap: 12px; justify-content: space-between; align-items: center; margin-top: 17px; padding-top: 15px; border-top: 1px solid #eeeef8; }
+.hr-job-card-foot > span { font-size: 12px; color: #6c748d; }
+.hr-job-card-foot > a { text-decoration: none; }
+.hr-back-link { display: inline-flex; color: #6054cc; padding: 6px 0 20px; text-decoration: none; font-size: 14px; }
+.hr-heading-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.hr-heading-actions .jobs-stop { border-radius: 10px; min-height: 44px; padding: 10px 14px; cursor: pointer; }
+.hr-heading-actions a.admin-detail-button { text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.hr-heading-actions button.admin-detail-button { min-height: 44px; }
+.hr-detail-panel { margin: 22px 0; padding: 22px; border: 1px solid #eceaf5; border-radius: 15px; min-width: 0; }
+.hr-detail-panel > h3 { margin: 0 0 14px; }
+.hr-detail-panel .jobs-requirements { overflow-wrap: anywhere; }
+.hr-warning { border: 1px solid #ffca97; background: #fff8ec; border-radius: 10px; padding: 12px 14px; color: #945a1d; font-size: 14px; }
+.hr-candidate-list { display: flex; flex-direction: column; gap: 9px; }
+.hr-candidate-card { padding: 14px 16px; display: flex; align-items: center; gap: 14px; border: 1px solid #e9eaf5; border-radius: 12px; min-width: 0; }
+.hr-candidate-card > div:first-child { min-width: 150px; }
+.hr-candidate-card strong { color: #283451; }
+.hr-candidate-card p { font-size: 12px; color: #788198; margin: 5px 0 0; }
+.hr-candidate-flags { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+.hr-candidate-flags span { font-size: 12px; background: #f5f3ff; color: #5b5485; padding: 5px 8px; border-radius: 8px; }
+.hr-candidate-card > a { text-decoration: none; }
+@media (max-width: 960px) {
+  .hr-job-cards { grid-template-columns: minmax(0, 1fr); }
+  .hr-candidate-card { flex-wrap: wrap; }
+}
+@media (max-width: 650px) {
+  .main-content:has(.hr-workspace) { padding: 16px 12px 72px; }
+  .admin-dashboard .hr-workspace-panel { padding: 20px 16px; border-radius: 16px; }
+  .hr-workspace-heading { flex-direction: column; }
+  .hr-workspace-heading > .hr-primary-btn { width: 100%; }
+  .hr-workspace-stats { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+  .hr-workspace-stats > div { padding: 13px; }
+  .hr-workspace-stats strong { font-size: 24px; }
+  .hr-form-grid { grid-template-columns: 1fr; }
+  .hr-workspace-filters > input { flex-basis: 100%; }
+  .hr-job-card { padding: 15px; }
+  .hr-job-card-foot { flex-wrap: wrap; }
+  .hr-job-card-foot > a { margin-left: auto; }
+  .hr-detail-panel { padding: 15px; }
+  .hr-candidate-card > div:first-child { min-width: 0; width: 100%; }
+  .hr-candidate-card > a { margin-left: auto; }
+  .hr-heading-actions { width: 100%; }
+  .hr-heading-actions > button { flex: 1; }
+  /* Existing HR interview list is a readable card list on narrow screens. */
+  .admin-dashboard .admin-table-scroll { overflow: visible; }
+  .admin-dashboard .admin-interviews-table { min-width: 0; display: block; }
+  .admin-dashboard .admin-interviews-table thead { display: none; }
+  .admin-dashboard .admin-interviews-table tbody { display: grid; gap: 12px; }
+  .admin-dashboard .admin-interviews-table tr { display: block; padding: 10px 14px; border: 1px solid #e8e6fa; border-radius: 14px; background: white; }
+  .admin-dashboard .admin-interviews-table td { display: flex; gap: 12px; justify-content: space-between; align-items: center; border: 0; padding: 8px 0; overflow-wrap: anywhere; text-align: right; }
+  .admin-dashboard .admin-interviews-table td::before { content: attr(data-label); color: #6c748d; flex-shrink: 0; text-align: left; font-size: 12px; }
+  .admin-dashboard .admin-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .admin-dashboard .jobs-dashboard-entry button { white-space: normal; }
+  .navbar { gap: 10px; }
+  .nav-links { gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+  .nav-links a { font-size: 12px; }
+}
+
+.hr-mobile-dock { display: none; }
+@media (max-width: 650px) {
+  .navbar { height: auto; min-height: 64px; padding: 10px 14px; flex-wrap: wrap; }
+  .brand { font-size: 17px; gap: 7px; }
+  .brand-icon { width: 33px; height: 33px; font-size: 21px; }
+  .hr-mobile-dock { display: flex; position: fixed; z-index: 1000; left: 0; right: 0; bottom: 0; padding: 8px 12px max(12px, env(safe-area-inset-bottom)); justify-content: space-evenly; background: #fff; border-top: 1px solid #e8e7f4; box-shadow: 0 -5px 20px rgba(40,40,90,.06); }
+  .hr-mobile-dock a { min-height: 45px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; color: #6b718a; font-size: 18px; min-width: 90px; }
+  .hr-mobile-dock a span { font-size: 12px; }
+  .hr-mobile-dock a.active { color: #644bea; font-weight: 700; }
+  .app:has(> .hr-mobile-dock) .main-content { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+}
