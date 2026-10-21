@@ -23,6 +23,7 @@ from app.database import get_db
 from app.models import Interview, JobPosting, Message
 from app.interview_create_limiter import require_create_capacity
 from app.services.agent_service import generate_question_agent
+from app.model_usage import model_usage_scope, link_interview_to_trace
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["HR招聘任务与面试邀请"])
@@ -183,9 +184,10 @@ async def create_invited_interview(
     require_create_capacity(invite_code=invite_code)
 
     try:
-        question = await run_in_threadpool(
-            generate_question_agent, position, difficulty, requirements
-        )
+        with model_usage_scope(stage="first_question", job_id=job_id) as usage_trace:
+            question = await run_in_threadpool(
+                generate_question_agent, position, difficulty, requirements
+            )
     except APITimeoutError:
         logger.exception("邀请面试首次提问超时")
         raise HTTPException(status_code=504, detail="AI 服务响应超时，请稍后重试")
@@ -216,6 +218,7 @@ async def create_invited_interview(
         db.flush()
         db.add(Message(interview_id=interview.id, role="assistant", content=question))
         db.commit()
+        link_interview_to_trace(usage_trace, interview.id)
         db.refresh(interview)
     except Exception:
         db.rollback()

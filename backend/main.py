@@ -50,6 +50,7 @@ from app.structured_interview import stage_after_answer, CLOSING_MESSAGE, QUESTI
 from app.admin_workflow import router as admin_workflow_router
 from app.demo_routes import router as demo_router
 from app.evaluation_workflow import get_evaluation_state, generate_and_store_report
+from app.model_usage import model_usage_scope, link_interview_to_trace
 
 # 创建 FastAPI 应用
 app = FastAPI(
@@ -179,11 +180,12 @@ async def create_interview(
 
     # 2. 调用 DeepSeek 生成第一道面试题
     try:
-        question = await run_in_threadpool(
-            generate_question_agent,
-            request.position,
-            request.difficulty
-        )
+        with model_usage_scope(stage="first_question") as usage_trace:
+            question = await run_in_threadpool(
+                generate_question_agent,
+                request.position,
+                request.difficulty
+            )
 
     except APITimeoutError:
         logger.exception("DeepSeek 生成面试题超时")
@@ -232,6 +234,7 @@ async def create_interview(
 
         # 提交事务，一起保存面试和问题
         db.commit()
+        link_interview_to_trace(usage_trace, interview.id)
 
         # 3. 返回创建结果
         
@@ -366,23 +369,28 @@ async def interview_followup(
         answer_count = sum(1 for item in history if item["role"] == "user")
         next_stage = stage_after_answer(answer_count) if interview.job_id is not None else None
 
-        if next_stage == "finished":
-            # 第八次回答后不额外调用模型，提示候选人提交完成。
-            next_question = CLOSING_MESSAGE
-        elif next_stage in (None, "technical_followup"):
-            args = (interview.position, interview.difficulty, history)
-            if requirements:
-                args += (requirements,)
-            next_question = await run_in_threadpool(generate_followup_agent, *args)
-        else:
-            next_question = await run_in_threadpool(
-                generate_competency_question_agent,
-                interview.position,
-                interview.difficulty,
-                requirements,
-                next_stage,
-                history,
-            )
+        with model_usage_scope(
+            stage="followup" if next_stage in (None, "technical_followup") else (next_stage or "closing"),
+            interview_id=interview.id,
+            job_id=interview.job_id,
+        ):
+            if next_stage == "finished":
+                # 第八次回答后不额外调用模型，提示候选人提交完成。
+                next_question = CLOSING_MESSAGE
+            elif next_stage in (None, "technical_followup"):
+                args = (interview.position, interview.difficulty, history)
+                if requirements:
+                    args += (requirements,)
+                next_question = await run_in_threadpool(generate_followup_agent, *args)
+            else:
+                next_question = await run_in_threadpool(
+                    generate_competency_question_agent,
+                    interview.position,
+                    interview.difficulty,
+                    requirements,
+                    next_stage,
+                    history,
+                )
 
     except HTTPException:
         raise
