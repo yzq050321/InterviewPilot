@@ -5,9 +5,13 @@ import { deactivateJob, getJobs } from "../services/jobApi";
 import type { JobPosting } from "../services/jobApi";
 import { evaluationLabels, reviewLabels } from "../services/adminWorkflowApi";
 import { interviewsForJob, showDate, summarizeJob } from "../services/jobWorkspace";
+import { getPipelineOverview, stageLabels } from "../services/pipelineApi";
+import type { RecruitmentStage } from "../services/pipelineApi";
+import "./Pipeline.css";
 import type { WorkspaceInterview } from "../services/jobWorkspace";
 
 type RecordFilter = "all" | "pending" | "completed" | "failed";
+type StageFilter = "all" | RecruitmentStage;
 
 export default function AdminJobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -15,6 +19,8 @@ export default function AdminJobDetailPage() {
   const demoMode = sessionStorage.getItem("admin_role") === "demo";
   const [job, setJob] = useState<JobPosting | null>(null);
   const [interviews, setInterviews] = useState<WorkspaceInterview[]>([]);
+  const [stages, setStages] = useState<Record<number, RecruitmentStage>>({});
+  const [stageFilter, setStageFilter] = useState<StageFilter>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -26,11 +32,12 @@ export default function AdminJobDetailPage() {
     if (!sessionStorage.getItem("admin_token")) { navigate("/admin/login", { replace: true }); return; }
     if (!jobId || !/^[1-9]\d*$/.test(jobId)) { setError("岗位编号无效"); setLoading(false); return; }
     let cancelled = false;
-    Promise.all([getJobs(), getAdminInterviews()])
-      .then(([jobList, interviewList]) => {
+    Promise.all([getJobs(), getAdminInterviews(), getPipelineOverview()])
+      .then(([jobList, interviewList, stageList]) => {
         if (cancelled) return;
         setJob(jobList.find((item) => item.job_id === Number(jobId)) ?? null);
         setInterviews(interviewList);
+        setStages(Object.fromEntries(stageList.map((item) => [item.interview_id, item.stage])));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -47,11 +54,12 @@ export default function AdminJobDetailPage() {
   const visible = useMemo(() => linked.filter((item) => {
     const matchesText = `${item.candidate_name ?? ""} ${item.interview_id}`.toLowerCase().includes(keyword.trim().toLowerCase());
     if (!matchesText) return false;
+    if (stageFilter !== "all" && (stages[item.interview_id] ?? "new") !== stageFilter) return false;
     if (filter === "pending") return item.status === "completed" && item.review_status === "pending";
     if (filter === "completed") return item.status === "completed";
     if (filter === "failed") return item.evaluation_status === "failed";
     return true;
-  }), [linked, keyword, filter]);
+  }), [linked, keyword, filter, stageFilter, stages]);
 
   async function copyInvitation() {
     if (!job || !job.is_active || demoMode || !job.invite_path) return;
@@ -106,8 +114,8 @@ export default function AdminJobDetailPage() {
           {!demoMode && <section className="hr-detail-panel" aria-label="面试邀请"><h3>面试邀请</h3><p className="jobs-hint">仅已启用的岗位允许新候选人通过链接参加面试。请注意候选人信息保护。</p><div className="jobs-url">{`${window.location.origin}${job.invite_path}`}</div><div className="hr-heading-actions"><button type="button" className="admin-detail-button" disabled={!job.is_active} onClick={() => { void copyInvitation(); }}>复制链接</button><a className="admin-detail-button" href={job.invite_path} target="_blank" rel="noopener noreferrer">预览邀请页 ↗</a></div></section>}
           <section aria-label="此岗位面试列表" className="hr-detail-panel">
             <div className="hr-list-title"><h3>候选人面试记录</h3><span>显示 {visible.length} / {linked.length} 场</span></div>
-            <div className="hr-workspace-filters" role="search" aria-label="岗位内筛选"><input aria-label="按候选人或面试编号搜索" placeholder="搜索候选人姓名或面试编号" value={keyword} onChange={(e) => setKeyword(e.target.value)} /><div className="hr-filter-buttons" role="group" aria-label="面试筛选">{([ ["all", "全部"], ["pending", "待复核"], ["completed", "已完成"], ["failed", "报告失败"] ] as const).map(([v, label]) => <button key={v} type="button" className={filter === v ? "is-selected" : ""} aria-pressed={filter === v} onClick={() => setFilter(v)}>{label}</button>)}</div></div>
-            {visible.length === 0 ? <p className="jobs-hint">{linked.length ? "没有符合筛选条件的面试记录。" : "这个岗位暂时没有面试记录。"}</p> : <div className="hr-candidate-list">{visible.map((entry) => <article key={entry.interview_id} className="hr-candidate-card"><div><strong>{entry.candidate_name || "未填写姓名"}</strong><p>面试 #{entry.interview_id} · {showDate(entry.created_at)}</p></div><div className="hr-candidate-flags"><span>{entry.status === "completed" ? "面试已完成" : "面试中"}</span><span>{evaluationLabels[entry.evaluation_status] || "未评估"}</span><span>{reviewLabels[entry.review_status] || "待人工复核"}</span></div><Link className="admin-detail-button" to={`/admin/interviews/${entry.interview_id}`}>查看面试 →</Link></article>)}</div>}
+            <div className="hr-workspace-filters" role="search" aria-label="岗位内筛选"><input aria-label="按候选人或面试编号搜索" placeholder="搜索候选人姓名或面试编号" value={keyword} onChange={(e) => setKeyword(e.target.value)} /><div className="hr-filter-buttons" role="group" aria-label="面试筛选">{([ ["all", "全部"], ["pending", "待复核"], ["completed", "已完成"], ["failed", "报告失败"] ] as const).map(([v, label]) => <button key={v} type="button" className={filter === v ? "is-selected" : ""} aria-pressed={filter === v} onClick={() => setFilter(v)}>{label}</button>)}</div><select className="pipeline-filter" aria-label="按招聘阶段筛选" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as StageFilter)}><option value="all">全部招聘阶段</option>{Object.entries(stageLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+            {visible.length === 0 ? <p className="jobs-hint">{linked.length ? "没有符合筛选条件的面试记录。" : "这个岗位暂时没有面试记录。"}</p> : <div className="hr-candidate-list">{visible.map((entry) => <article key={entry.interview_id} className="hr-candidate-card"><div><strong>{entry.candidate_name || "未填写姓名"}</strong><p>面试 #{entry.interview_id} · {showDate(entry.created_at)}</p></div><div className="hr-candidate-flags"><span>{entry.status === "completed" ? "面试已完成" : "面试中"}</span><span>{evaluationLabels[entry.evaluation_status] || "未评估"}</span><span>{reviewLabels[entry.review_status] || "待人工复核"}</span><span className="pipeline-tag">阶段：{stageLabels[stages[entry.interview_id] ?? "new"]}</span></div><Link className="admin-detail-button" to={`/admin/interviews/${entry.interview_id}`}>查看面试 →</Link></article>)}</div>}
             <p className="jobs-hint">本页按面试记录统计，不按姓名合并候选人；HR 复核结论仍需在面试详情中人工确认。</p>
           </section>
         </>}

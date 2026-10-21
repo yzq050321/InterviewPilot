@@ -49,6 +49,7 @@ from app.job_routes import router as job_router
 from app.structured_interview import stage_after_answer, CLOSING_MESSAGE, QUESTION_LIMIT
 from app.admin_workflow import router as admin_workflow_router
 from app.demo_routes import router as demo_router
+from app.pipeline import router as pipeline_router
 from app.evaluation_workflow import get_evaluation_state, generate_and_store_report
 from app.model_usage import model_usage_scope, link_interview_to_trace
 
@@ -61,6 +62,7 @@ app = FastAPI(
 app.include_router(job_router)
 app.include_router(admin_workflow_router)
 app.include_router(demo_router)
+app.include_router(pipeline_router)
 
 candidate_bearer = HTTPBearer(auto_error=False)
 

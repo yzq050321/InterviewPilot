@@ -125,3 +125,26 @@ def demo_evaluation(interview_id: int):
     if interview_id != DEMO_INTERVIEW_ID:
         raise HTTPException(status_code=404, detail="演示报告不存在")
     return DEMO_REPORT
+
+
+# Batch 9 synthetic read-only recruitment stages. No DB access.
+DEMO_PIPELINE = {
+    DEMO_INTERVIEW_ID: {"stage": "contact", "history": [{
+        "id": 900000001, "interview_id": DEMO_INTERVIEW_ID,
+        "old_stage": "new", "new_stage": "contact",
+        "note": "虚构示例：HR 已查看面试，准备人工沟通。", "created_at": DATE,
+    }]},
+    DEMO_IN_PROGRESS_ID: {"stage": "new", "history": []},
+}
+
+@router.get("/pipeline")
+def demo_pipeline():
+    return [{"interview_id": key, "stage": value["stage"]}
+            for key, value in DEMO_PIPELINE.items()]
+
+@router.get("/interviews/{interview_id}/pipeline")
+def demo_pipeline_detail(interview_id: int):
+    item = DEMO_PIPELINE.get(interview_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="演示面试不存在")
+    return {"interview_id": interview_id, **item}

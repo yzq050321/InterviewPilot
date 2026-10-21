@@ -77,6 +77,11 @@ class Interview(Base):
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # Batch 9：人工招聘流程阶段，独立于 AI 评估和人工复核状态。
+    recruitment_stage: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="new", server_default="new"
+    )
+
     # 一场面试对应多条消息
     messages: Mapped[list["Message"]] = relationship(
         back_populates="interview",
@@ -252,4 +257,19 @@ class JobPosting(Base):
         DateTime,
         server_default=func.now(),
         nullable=False,
+    )
+
+class InterviewFollowup(Base):
+    """Append-only HR follow-up log. Does not change the candidate's AI report."""
+    __tablename__ = "interview_followups"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    interview_id: Mapped[int] = mapped_column(
+        ForeignKey("interviews.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    old_stage: Mapped[str] = mapped_column(String(24), nullable=False)
+    new_stage: Mapped[str] = mapped_column(String(24), nullable=False)
+    note: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
     )

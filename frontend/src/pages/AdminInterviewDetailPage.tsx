@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import PipelinePanel from "./PipelinePanel";
 import { useNavigate, useParams } from "react-router-dom";
 import {
     getAdminInterviewDetail,
@@ -290,6 +291,8 @@ export default function AdminInterviewDetailPage() {
                             </div>
                         </div>
 
+
+                        <PipelinePanel interviewId={interview.interview_id} demoMode={demoMode} />
 
                         <div className="admin-evaluation">
                             <h3>AI 面试评估报告</h3>
