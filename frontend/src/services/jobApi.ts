@@ -53,6 +53,7 @@ export type InvitedInterview = {
   position: string;
   difficulty: Difficulty;
   question: string;
+  question_id: number;
 };
 
 async function readError(response: Response, fallback: string): Promise<never> {

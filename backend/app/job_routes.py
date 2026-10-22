@@ -239,7 +239,9 @@ async def create_invited_interview(
     try:
         db.add(interview)
         db.flush()
-        db.add(Message(interview_id=interview.id, role="assistant", content=question))
+        first_message = Message(interview_id=interview.id, role="assistant", content=question)
+        db.add(first_message)
+        db.flush()
         db.commit()
         link_interview_to_trace(usage_trace, interview.id)
         db.refresh(interview)
@@ -256,4 +258,5 @@ async def create_invited_interview(
         "position": interview.position,
         "difficulty": interview.difficulty,
         "question": question,
+        "question_id": first_message.id,
     }

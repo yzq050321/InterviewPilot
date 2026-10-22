@@ -51,6 +51,22 @@ function App() {
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [finishing, setFinishing] = useState(false);
   const submittingRef = useRef(false);
+  // One durable request identifier per unanswered question. Keep it on timeout,
+  // so a retry reuses the same identifier rather than paying for another LLM call.
+  type PendingAnswer = { requestId: string; questionId: number; answer: string };
+  function pendingKey(id: number) { return `pending_answer_${id}`; }
+  function readPending(id: number): PendingAnswer | null {
+    try {
+      const raw = sessionStorage.getItem(pendingKey(id));
+      if (!raw) return null;
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      const candidate = parsed as Partial<PendingAnswer>;
+      if (typeof candidate.requestId !== "string" || typeof candidate.questionId !== "number" || typeof candidate.answer !== "string") return null;
+      return candidate as PendingAnswer;
+    } catch { return null; }
+  }
+
 
 
   // 创建一场新的模拟面试
@@ -83,12 +99,14 @@ function App() {
         `interview_token_${data.interview_id}`,
         data.interview_token
       );
+      sessionStorage.removeItem(pendingKey(data.interview_id));
       setInterviewId(data.interview_id);
       setDifficulty("中等");
       navigate(`/interview/${data.interview_id}`);
 
       setMessages([
         {
+          id: data.question_id,
           role: "assistant",
           content: data.question,
         },
@@ -110,11 +128,12 @@ function App() {
   // 邀请面试复用现有候选人 Token、问答及完成报告流程。
   function handleInvitationStarted(data: InvitedInterview) {
     sessionStorage.setItem(`interview_token_${data.interview_id}`, data.interview_token);
+    sessionStorage.removeItem(pendingKey(data.interview_id));
     setCandidateName(data.candidate_name);
     setPosition(data.position);
     setDifficulty(data.difficulty);
     setInterviewId(data.interview_id);
-    setMessages([{ role: "assistant", content: data.question }]);
+    setMessages([{ id: data.question_id, role: "assistant", content: data.question }]);
     setAnswer("");
     setError("");
     setCompleted(false);
@@ -140,42 +159,47 @@ function App() {
     submittingRef.current = true;
 
     const currentAnswer = answer.trim();
+    const currentQuestion = [...messages].reverse().find((item) => item.role === "assistant");
+    if (!currentQuestion?.id) {
+      setError("无法确认当前题目，请刷新面试页面后再试");
+      submittingRef.current = false;
+      return;
+    }
+    const previous = readPending(interviewId);
+    if (previous && (previous.questionId !== currentQuestion.id || previous.answer !== currentAnswer)) {
+      // Do not silently reuse a request id with different content.
+      // A changed question means the previous response has already been saved.
+      if (previous.questionId === currentQuestion.id) {
+        setError("这道题有尚未确认的提交，请先用原回答重试或刷新页面");
+        submittingRef.current = false;
+        return;
+      }
+      sessionStorage.removeItem(pendingKey(interviewId));
+    }
+    const pending: PendingAnswer = previous && previous.questionId === currentQuestion.id
+      ? previous
+      : { requestId: crypto.randomUUID(), questionId: currentQuestion.id, answer: currentAnswer };
+    sessionStorage.setItem(pendingKey(interviewId), JSON.stringify(pending));
 
     setLoading(true);
     setError("");
-
     try {
-      // 调用封装后的 API
       const data = await submitInterviewAnswer(
-        interviewId,
-        currentAnswer
+        interviewId, currentAnswer, pending.requestId, pending.questionId
       );
-
-      // 更新聊天记录
       setMessages((prev) => [
         ...prev,
-        {
-          role: "user",
-          content: currentAnswer,
-        },
-        {
-          role: "assistant",
-          content: data.next_question,
-        },
+        { role: "user", content: currentAnswer },
+        { id: data.question_id, role: "assistant", content: data.next_question },
       ]);
-
-      // 清空输入框，重置相关状态
+      sessionStorage.removeItem(pendingKey(interviewId));
       setAnswer("");
       setCompleted(false);
       setEvaluation(null);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "提交回答失败"
-      );
+      // Retain pending request id/answer for safe replays after timeouts.
+      setError(err instanceof Error ? err.message : "提交回答失败，请使用原回答重试");
     } finally {
-      // 无论成功或失败，都释放提交锁
       submittingRef.current = false;
       setLoading(false);
     }
@@ -184,9 +208,8 @@ function App() {
 
 
 
-
   async function generateReport(id: number) {
-    // 通知后端生成评估报告，并保存到数据库
+  // 通知后端生成评估报告，并保存到数据库
     // 候选人不读取报告内容，报告由 HR 在 B 端查看
     await generateInterviewEvaluation(id);
   }
@@ -295,12 +318,18 @@ function App() {
 
         setMessages(
           data.messages.map((message) => ({
+            id: message.id,
             role: message.role === "user" ? "user" : "assistant",
             content: message.content,
           }))
         );
 
-        setAnswer("");
+        const last = [...data.messages].reverse().find((item) => item.role === "assistant");
+        const pending = readPending(id);
+        if (pending && (!last || pending.questionId !== last.id || data.status !== "in_progress")) {
+          sessionStorage.removeItem(pendingKey(id));
+        }
+        setAnswer(pending && last?.id === pending.questionId && data.status === "in_progress" ? pending.answer : "");
         setCompleted(data.status !== "in_progress");
 
         // C 端不读取 AI 评估报告

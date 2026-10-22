@@ -1,6 +1,6 @@
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, JSON, Boolean
+from sqlalchemy import Column, Integer, JSON, Boolean, UniqueConstraint
 from sqlalchemy import (
     String,
     Text,
@@ -276,3 +276,26 @@ class InterviewFollowup(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
+
+
+class AnswerAttempt(Base):
+    """One durable candidate answer attempt per interview question."""
+    __tablename__ = "interview_answer_attempts"
+    __table_args__ = (
+        UniqueConstraint("interview_id", "question_id", name="uq_answer_attempt_question"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    interview_id: Mapped[int] = mapped_column(
+        ForeignKey("interviews.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question_id: Mapped[int] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), nullable=False
+    )
+    request_id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True)
+    answer_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    next_question_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    next_question: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_stage: Mapped[str | None] = mapped_column(String(32), nullable=True)
