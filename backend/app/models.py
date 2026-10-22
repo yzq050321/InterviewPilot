@@ -259,6 +259,9 @@ class JobPosting(Base):
         nullable=False,
     )
 
+    # Batch 10A: 邀请链接到期时间，以 UTC naive DATETIME 存储。
+    invite_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
 class InterviewFollowup(Base):
     """Append-only HR follow-up log. Does not change the candidate's AI report."""
     __tablename__ = "interview_followups"

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getAdminInterviews } from "../services/api";
-import { deactivateJob, getJobs } from "../services/jobApi";
+import { deactivateJob, getJobs, invitationIsOpen, invitationDeadline } from "../services/jobApi";
 import type { JobPosting } from "../services/jobApi";
 import { evaluationLabels, reviewLabels } from "../services/adminWorkflowApi";
 import { interviewsForJob, showDate, summarizeJob } from "../services/jobWorkspace";
@@ -62,7 +62,7 @@ export default function AdminJobDetailPage() {
   }), [linked, keyword, filter, stageFilter, stages]);
 
   async function copyInvitation() {
-    if (!job || !job.is_active || demoMode || !job.invite_path) return;
+    if (!job || !invitationIsOpen(job) || demoMode || !job.invite_path) return;
     setError(""); setNotice("");
     const link = `${window.location.origin}${job.invite_path}`;
     try {
@@ -99,10 +99,11 @@ export default function AdminJobDetailPage() {
             <div>
               <span className="hr-eyebrow">招聘任务 #{job.job_id}{demoMode ? " · 虚构演示" : ""}</span>
               <h2>{job.title}</h2>
-              <p>{job.position} · {job.difficulty}难度 · {job.is_active ? "招聘中" : "已停用"} · 创建于 {showDate(job.created_at)}</p>
+              <p>{job.position} · {job.difficulty}难度 · {invitationIsOpen(job) ? "招聘中" : job.is_active ? "邀请已过期" : "已停用"} · 创建于 {showDate(job.created_at)}</p>
             </div>
-            {!demoMode && <div className="hr-heading-actions"><button type="button" className="hr-primary-btn" onClick={() => { void copyInvitation(); }} disabled={!job.is_active}>复制面试邀请</button><button type="button" className="jobs-stop" disabled={!job.is_active || busy} onClick={() => { void stopJob(); }}>{busy ? "停用中..." : job.is_active ? "停用岗位" : "已停用"}</button></div>}
+            {!demoMode && <div className="hr-heading-actions"><button type="button" className="hr-primary-btn" onClick={() => { void copyInvitation(); }} disabled={!invitationIsOpen(job)}>复制面试邀请</button><button type="button" className="jobs-stop" disabled={!job.is_active || busy} onClick={() => { void stopJob(); }}>{busy ? "停用中..." : job.is_active ? "停用岗位" : "已停用"}</button></div>}
           </div>
+          <p className="jobs-hint">面试邀请截止：{invitationDeadline(job)}。过期后不能创建新面试，已有面试保持可用。</p>
           <div className="hr-workspace-stats" aria-label="岗位面试统计">
             <div><strong>{stats.total}</strong><span>面试记录</span></div>
             <div><strong>{stats.completed}</strong><span>已完成面试</span></div>
@@ -111,7 +112,7 @@ export default function AdminJobDetailPage() {
           </div>
           {stats.failed > 0 && <p className="hr-warning" role="status">有 {stats.failed} 场面试的 AI 报告生成失败，请在对应面试详情中查看恢复方式。</p>}
           <section className="hr-detail-panel" aria-label="岗位要求"><h3>岗位要求</h3><p className="jobs-requirements">{job.requirements}</p></section>
-          {!demoMode && <section className="hr-detail-panel" aria-label="面试邀请"><h3>面试邀请</h3><p className="jobs-hint">仅已启用的岗位允许新候选人通过链接参加面试。请注意候选人信息保护。</p><div className="jobs-url">{`${window.location.origin}${job.invite_path}`}</div><div className="hr-heading-actions"><button type="button" className="admin-detail-button" disabled={!job.is_active} onClick={() => { void copyInvitation(); }}>复制链接</button><a className="admin-detail-button" href={job.invite_path} target="_blank" rel="noopener noreferrer">预览邀请页 ↗</a></div></section>}
+          {!demoMode && <section className="hr-detail-panel" aria-label="面试邀请"><h3>面试邀请</h3><p className="jobs-hint">只有岗位启用且邀请未过期时，才能创建新面试。请注意候选人信息保护。</p><div className="jobs-url">{`${window.location.origin}${job.invite_path}`}</div><div className="hr-heading-actions"><button type="button" className="admin-detail-button" disabled={!invitationIsOpen(job)} onClick={() => { void copyInvitation(); }}>复制链接</button><a className="admin-detail-button" href={job.invite_path} target="_blank" rel="noopener noreferrer">预览邀请页 ↗</a></div></section>}
           <section aria-label="此岗位面试列表" className="hr-detail-panel">
             <div className="hr-list-title"><h3>候选人面试记录</h3><span>显示 {visible.length} / {linked.length} 场</span></div>
             <div className="hr-workspace-filters" role="search" aria-label="岗位内筛选"><input aria-label="按候选人或面试编号搜索" placeholder="搜索候选人姓名或面试编号" value={keyword} onChange={(e) => setKeyword(e.target.value)} /><div className="hr-filter-buttons" role="group" aria-label="面试筛选">{([ ["all", "全部"], ["pending", "待复核"], ["completed", "已完成"], ["failed", "报告失败"] ] as const).map(([v, label]) => <button key={v} type="button" className={filter === v ? "is-selected" : ""} aria-pressed={filter === v} onClick={() => setFilter(v)}>{label}</button>)}</div><select className="pipeline-filter" aria-label="按招聘阶段筛选" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as StageFilter)}><option value="all">全部招聘阶段</option>{Object.entries(stageLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>

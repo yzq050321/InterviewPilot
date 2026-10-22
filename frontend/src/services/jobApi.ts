@@ -11,6 +11,7 @@ export type JobPosting = {
   difficulty: Difficulty;
   is_active: boolean;
   created_at: string;
+  invite_expires_at: string | null;
   invite_code: string;
   invite_path: string;
 };
@@ -20,6 +21,7 @@ export type CreateJobInput = {
   position: string;
   requirements: string;
   difficulty: Difficulty;
+  invite_valid_days: 7 | 14 | 30;
 };
 
 export type JobInvitation = {
@@ -28,6 +30,21 @@ export type JobInvitation = {
   requirements: string;
   difficulty: Difficulty;
 };
+
+/** 后端 invite_expires_at 是 UTC naive DATETIME；接口 JSON 不含时区。 */
+export function invitationIsOpen(job: JobPosting): boolean {
+  if (!job.is_active || !job.invite_expires_at) return false;
+  const raw = job.invite_expires_at;
+  const parsed = Date.parse(/[Zz]|[+-]\d\d:\d\d$/.test(raw) ? raw : `${raw}Z`);
+  return Number.isFinite(parsed) && parsed > Date.now();
+}
+
+export function invitationDeadline(job: JobPosting): string {
+  if (!job.invite_expires_at) return "未配置";
+  const raw = job.invite_expires_at;
+  const parsed = Date.parse(/[Zz]|[+-]\d\d:\d\d$/.test(raw) ? raw : `${raw}Z`);
+  return Number.isFinite(parsed) ? new Date(parsed).toLocaleString("zh-CN", { hour12: false }) : "无效时间";
+}
 
 export type InvitedInterview = {
   interview_id: number;

@@ -1,6 +1,7 @@
 /** Batch 8: Front-end projections of existing authorized job / interview data.
  * No new HR permissions, database fields, or candidate information are introduced.
  */
+import { invitationIsOpen } from "./jobApi";
 import type { JobPosting } from "./jobApi";
 import type { getAdminInterviews } from "./api";
 
@@ -24,7 +25,7 @@ export function summarizeJob(items: WorkspaceInterview[]) {
 export function summarizeWorkspace(jobs: JobPosting[], interviews: WorkspaceInterview[]) {
   const jobIds = new Set(jobs.map((item) => item.job_id));
   const linked = interviews.filter((item) => item.job_id !== null && jobIds.has(item.job_id));
-  return { activeJobs: jobs.filter((job) => job.is_active).length, ...summarizeJob(linked) };
+  return { activeJobs: jobs.filter(invitationIsOpen).length, ...summarizeJob(linked) };
 }
 
 export function showDate(value: string | null | undefined): string {

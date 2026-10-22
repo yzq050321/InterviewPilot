@@ -25,6 +25,8 @@ DEMO_JOB = {
     "difficulty": "中等",
     "is_active": True,
     "created_at": DATE,
+    # Virtual demo fixture remains visible without creating a usable invitation.
+    "invite_expires_at": "2099-01-01T00:00:00",
     "invite_code": "",
     "invite_path": "",
 }

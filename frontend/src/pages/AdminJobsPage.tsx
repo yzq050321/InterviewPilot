@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getAdminInterviews } from "../services/api";
-import { createJob, getJobs } from "../services/jobApi";
+import { createJob, getJobs, invitationIsOpen, invitationDeadline } from "../services/jobApi";
 import type { CreateJobInput, Difficulty, JobPosting } from "../services/jobApi";
 import { interviewsForJob, summarizeJob, summarizeWorkspace } from "../services/jobWorkspace";
 import type { WorkspaceInterview } from "../services/jobWorkspace";
 
-const INITIAL_FORM: CreateJobInput = { title: "", position: "", requirements: "", difficulty: "中等" };
+const INITIAL_FORM: CreateJobInput = { title: "", position: "", requirements: "", difficulty: "中等", invite_valid_days: 7 };
 const TEMPLATES: { label: string; position: string; requirements: string; difficulty: Difficulty }[] = [
   { label: "Python 后端", position: "Python 后端开发实习生", requirements: "熟悉 Python 基础语法，了解 FastAPI 或其他 Web 框架，了解 MySQL、RESTful API 与 Git，能够描述实际项目中的问题解决过程。", difficulty: "中等" },
   { label: "前端开发", position: "前端开发实习生", requirements: "熟悉 HTML、CSS、JavaScript 基础，了解 React、TypeScript、HTTP 请求与浏览器调试工具，能够说明响应式页面的实现思路。", difficulty: "中等" },
@@ -54,7 +54,7 @@ export default function AdminJobsPage() {
   const totals = useMemo(() => summarizeWorkspace(jobs, interviews), [jobs, interviews]);
   const filtered = useMemo(() => jobs.filter((job) => {
     const textMatch = `${job.title} ${job.position} ${job.job_id}`.toLowerCase().includes(keyword.trim().toLowerCase());
-    return textMatch && (filter === "all" || (filter === "active" ? job.is_active : !job.is_active));
+    return textMatch && (filter === "all" || (filter === "active" ? invitationIsOpen(job) : !invitationIsOpen(job)));
   }), [jobs, keyword, filter]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -62,7 +62,7 @@ export default function AdminJobsPage() {
     if (saving || demoMode) return;
     setError(""); setNotice(""); setSaving(true);
     try {
-      const job = await createJob({ title: form.title.trim(), position: form.position.trim(), requirements: form.requirements.trim(), difficulty: form.difficulty });
+      const job = await createJob({ title: form.title.trim(), position: form.position.trim(), requirements: form.requirements.trim(), difficulty: form.difficulty, invite_valid_days: form.invite_valid_days });
       setJobs((prev) => [job, ...prev]);
       setForm({ ...INITIAL_FORM }); setShowForm(false); setFilter("all"); setKeyword("");
       setNotice(`「${job.title}」创建成功，打开详情即可获取面试邀请链接。`);
@@ -74,7 +74,7 @@ export default function AdminJobsPage() {
   }
 
   function applyTemplate(template: typeof TEMPLATES[number]) {
-    setForm({ title: `${template.position}招聘`, position: template.position, requirements: template.requirements, difficulty: template.difficulty });
+    setForm({ title: `${template.position}招聘`, position: template.position, requirements: template.requirements, difficulty: template.difficulty, invite_valid_days: form.invite_valid_days });
   }
 
   return (
@@ -115,6 +115,7 @@ export default function AdminJobsPage() {
             </div>
             <div className="form-group"><label htmlFor="job-requirements">岗位要求（候选人可见）</label><textarea id="job-requirements" required maxLength={2000} rows={4} value={form.requirements} disabled={saving} onChange={(e) => setForm((v) => ({ ...v, requirements: e.target.value }))} placeholder="请描述岗位要求，不要填写企业机密。" /></div>
             <div className="form-group"><label htmlFor="job-difficulty">面试难度</label><select id="job-difficulty" value={form.difficulty} disabled={saving} onChange={(e) => setForm((v) => ({ ...v, difficulty: e.target.value as Difficulty }))}><option value="简单">简单</option><option value="中等">中等</option><option value="困难">困难</option></select></div>
+            <div className="form-group"><label htmlFor="job-invite-days">邀请链接有效期</label><select id="job-invite-days" value={form.invite_valid_days} disabled={saving} onChange={(e) => setForm((v) => ({ ...v, invite_valid_days: Number(e.target.value) as 7 | 14 | 30 }))}><option value={7}>7 天（推荐）</option><option value={14}>14 天</option><option value={30}>30 天</option></select><p className="jobs-hint">链接过期后无法新建面试；已开始的面试不受影响。</p></div>
             <button type="submit" className="hr-primary-btn" disabled={saving || !form.title.trim() || !form.position.trim() || !form.requirements.trim()}>{saving ? "正在创建..." : "保存招聘任务"}</button>
           </form>}
 
@@ -128,9 +129,10 @@ export default function AdminJobsPage() {
             </div>
             {filtered.length === 0 ? <p className="jobs-hint">{jobs.length ? "没有符合筛选条件的岗位。" : "目前还没有招聘任务。"}</p> : <div className="hr-job-cards">{filtered.map((job) => {
               const stat = summarizeJob(interviewsForJob(interviews, job.job_id));
+              const accepting = invitationIsOpen(job);
               return <article key={job.job_id} className="hr-job-card">
-                <div className="hr-job-head"><div><span className={`hr-status-dot ${job.is_active ? "" : "is-inactive"}`} aria-hidden="true" /><h4>{job.title}</h4></div><span className="hr-job-status">{job.is_active ? "招聘中" : "已停用"}</span></div>
-                <p className="hr-job-meta">{job.position} · {job.difficulty}难度 · 任务 #{job.job_id}</p>
+                <div className="hr-job-head"><div><span className={`hr-status-dot ${accepting ? "" : "is-inactive"}`} aria-hidden="true" /><h4>{job.title}</h4></div><span className="hr-job-status">{accepting ? "招聘中" : job.is_active ? "邀请已过期" : "已停用"}</span></div>
+                <p className="hr-job-meta">{job.position} · {job.difficulty}难度 · 任务 #{job.job_id} · 邀请截止 {invitationDeadline(job)}</p>
                 <div className="hr-job-metrics"><span>面试 {stat.total}</span><span>已完成 {stat.completed}</span><span>报告 {stat.ready}</span><span>待复核 {stat.pendingReview}</span>{stat.failed > 0 && <span className="hr-alert-metric">报告失败 {stat.failed}</span>}</div>
                 <div className="hr-job-card-foot"><span>{stat.pendingReview > 0 ? `${stat.pendingReview} 场已结束面试待处理` : "查看该岗位的邀请和面试记录"}</span><Link className="admin-detail-button" to={`/admin/jobs/${job.job_id}`}>查看岗位 →</Link></div>
               </article>;

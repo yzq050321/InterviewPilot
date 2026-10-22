@@ -7,6 +7,7 @@ are not exposed here.
 
 import logging
 import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -36,6 +37,7 @@ class CreateJobRequest(BaseModel):
     position: str = Field(min_length=1, max_length=100)
     requirements: str = Field(min_length=1, max_length=2000)
     difficulty: Literal["简单", "中等", "困难"] = "中等"
+    invite_valid_days: Literal[7, 14, 30] = 7
 
     @field_validator("title", "position", "requirements")
     @classmethod
@@ -60,6 +62,25 @@ class InvitationInterviewRequest(BaseModel):
         return value
 
 
+def _utc_now() -> datetime:
+    # MySQL DATETIME 无时区：统一按 UTC 写入与比较。
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _invitation_expired(job: JobPosting, *, now: datetime | None = None) -> bool:
+    # 迁移后现有岗位会有 7 天宽限期；NULL 防御性地视为不可用。
+    cutoff = now if now is not None else _utc_now()
+    return job.invite_expires_at is None or job.invite_expires_at <= cutoff
+
+
+def _require_invitation_open(job: JobPosting | None) -> JobPosting:
+    if job is None or not job.is_active:
+        raise HTTPException(status_code=404, detail="面试邀请无效或已停用")
+    if _invitation_expired(job):
+        raise HTTPException(status_code=410, detail="面试邀请已过期，请联系招聘方获取新邀请")
+    return job
+
+
 def _job_dict(job: JobPosting, *, include_invitation: bool = False) -> dict:
     item = {
         "job_id": job.id,
@@ -69,6 +90,7 @@ def _job_dict(job: JobPosting, *, include_invitation: bool = False) -> dict:
         "difficulty": job.difficulty,
         "is_active": job.is_active,
         "created_at": job.created_at,
+        "invite_expires_at": job.invite_expires_at,
     }
     if include_invitation:
         item["invite_code"] = job.invite_code
@@ -90,6 +112,7 @@ def create_job(
         difficulty=request.difficulty,
         invite_code=secrets.token_urlsafe(24),
         is_active=True,
+        invite_expires_at=_utc_now() + timedelta(days=request.invite_valid_days),
     )
     try:
         db.add(job)
@@ -147,8 +170,7 @@ def get_job_invitation(
             JobPosting.is_active.is_(True),
         )
     )
-    if job is None:
-        raise HTTPException(status_code=404, detail="面试邀请无效或已停用")
+    job = _require_invitation_open(job)
     return {
         "title": job.title,
         "position": job.position,
@@ -173,8 +195,7 @@ async def create_invited_interview(
             JobPosting.is_active.is_(True),
         )
     )
-    if job is None:
-        raise HTTPException(status_code=404, detail="面试邀请无效或已停用")
+    job = _require_invitation_open(job)
 
     # The candidate does not control these values.
     job_id, position, difficulty = job.id, job.position, job.difficulty
@@ -203,6 +224,8 @@ async def create_invited_interview(
     )
     if job is None:
         raise HTTPException(status_code=409, detail="该招聘任务已停用")
+    if _invitation_expired(job):
+        raise HTTPException(status_code=410, detail="面试邀请已过期，请联系招聘方获取新邀请")
 
     candidate_token, token_hash = create_candidate_token()
     interview = Interview(
