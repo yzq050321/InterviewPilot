@@ -1,32 +1,41 @@
-# React + TypeScript + Vite
+# InterviewPilot Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 + TypeScript + Vite 前端，包含候选人端与 HR 招聘工作台。
 
-Currently, two official plugins are available:
+## 页面
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+| 路由 | 说明 |
+| --- | --- |
+| `/` | 候选人首页，创建模拟面试 |
+| `/invite/:inviteCode` | 通过 HR 邀请链接进入指定岗位 |
+| `/interview/:id` | 候选人面试聊天、刷新恢复与结束面试 |
+| `/admin/login` | HR / Demo 登录 |
+| `/admin` | 全部面试列表与筛选 |
+| `/admin/jobs` | 岗位工作台：统计、搜索、筛选、创建任务 |
+| `/admin/jobs/:jobId` | 岗位详情、邀请链接、候选人列表 |
+| `/admin/interviews/:id` | 完整问答、评估报告、招聘阶段、人工复核 |
 
-## React Compiler
+## 本地开发
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm ci
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Vite 已配置 `/api` 代理到 `http://127.0.0.1:8000`，因此前端代码使用同源 `/api`，不写死后端地址。生产环境由 Nginx 托管 `dist` 并把 `/api` 反代到 FastAPI。
+
+## 构建与检查
+
+```bash
+npm run build   # tsc -b + vite build
+npm run lint    # oxlint
+```
+
+当前 `npm run lint` 有 5 条 React Hook 规范警告，均为非阻断项；`npm run build` 通过。
+
+## 认证与恢复
+
+- HR 登录 Token 存在 `sessionStorage`，Demo 角色单独标记。
+- 候选人 Token 存在 `sessionStorage`，键名为 `interview_token_{interviewId}`。
+- 未确认的答题以 `{requestId, questionId, answer}` 存在 `pending_answer_{interviewId}`；刷新后复用同一 `request_id`，避免超时重试重复计费。
+- 前端不保存 API Key；所有模型调用都经后端转发。

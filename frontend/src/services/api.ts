@@ -1,5 +1,5 @@
 import type { InterviewDetail } from "../types/interview";
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "";
 
 /**
  * 获取历史面试记录
@@ -50,6 +50,7 @@ export async function createInterview(
   interview_token: string;
   candidate_name: string;
   question: string;
+  question_id: number;
 }> {
   const response = await fetch(`${API_BASE}/api/interviews`, {
     method: "POST",
@@ -77,48 +78,32 @@ export async function createInterview(
  */
 export async function submitInterviewAnswer(
   interviewId: number,
-  answer: string
-): Promise<{ next_question: string }> {
-  // 读取当前面试的候选人 Token
-  const token = sessionStorage.getItem(
-    `interview_token_${interviewId}`
-  );
+  answer: string,
+  requestId: string,
+  questionId: number
+): Promise<{ next_question: string; question_id: number; replayed: boolean }> {
+  const token = sessionStorage.getItem(`interview_token_${interviewId}`);
+  if (!token) throw new Error("面试访问凭证不存在，请重新开始面试");
 
-  if (!token) {
-    throw new Error("面试访问凭证不存在，请重新开始面试");
-  }
-
-  const response = await fetch(
-    `${API_BASE}/api/interviews/followup`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        interview_id: interviewId,
-        answer,
-      }),
-    }
-  );
+  const response = await fetch(`${API_BASE}/api/interviews/followup`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ interview_id: interviewId, answer, request_id: requestId, question_id: questionId }),
+  });
 
   if (!response.ok) {
     let message = `提交回答失败：${response.status}`;
-
     try {
-      const errorData = await response.json();
-
-      if (typeof errorData.detail === "string") {
-        message = errorData.detail;
-      }
+      const data = await response.json();
+      if (typeof data.detail === "string") message = data.detail;
     } catch {
-      // 无法解析错误响应时，保留默认错误信息
+      // Preserve HTTP status if response is not JSON.
     }
-
     throw new Error(message);
   }
-
   return response.json();
 }
 
@@ -401,9 +386,9 @@ export async function getAdminInterviewEvaluation(
   clarity_score: number;
   overall_score: number;
   summary: string;
-  strengths: string;
-  weaknesses: string;
-  suggestions: string;
+  strengths: string[];
+  weaknesses: string[];
+  suggestions: string[];
   created_at: string;
 }> {
   const token = sessionStorage.getItem("admin_token");

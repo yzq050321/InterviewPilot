@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import PipelinePanel from "./PipelinePanel";
 import { useNavigate, useParams } from "react-router-dom";
 import {
     getAdminInterviewDetail,
@@ -291,6 +292,8 @@ export default function AdminInterviewDetailPage() {
                         </div>
 
 
+                        <PipelinePanel interviewId={interview.interview_id} demoMode={demoMode} />
+
                         <div className="admin-evaluation">
                             <h3>AI 面试评估报告</h3>
                             <p style={{ color: "#566582", marginBottom: 12 }}>
@@ -353,17 +356,29 @@ export default function AdminInterviewDetailPage() {
 
                                     <div className="admin-evaluation-section">
                                         <h4>表现亮点</h4>
-                                        <p>{evaluation.strengths}</p>
+                                        <ul className="admin-evaluation-list">
+                                            {evaluation.strengths.map((item, index) => (
+                                                <li key={`strength-${index}`}>{item}</li>
+                                            ))}
+                                        </ul>
                                     </div>
 
                                     <div className="admin-evaluation-section">
                                         <h4>有待提升</h4>
-                                        <p>{evaluation.weaknesses}</p>
+                                        <ul className="admin-evaluation-list">
+                                            {evaluation.weaknesses.map((item, index) => (
+                                                <li key={`weakness-${index}`}>{item}</li>
+                                            ))}
+                                        </ul>
                                     </div>
 
                                     <div className="admin-evaluation-section">
                                         <h4>改进建议</h4>
-                                        <p>{evaluation.suggestions}</p>
+                                        <ul className="admin-evaluation-list">
+                                            {evaluation.suggestions.map((item, index) => (
+                                                <li key={`suggestion-${index}`}>{item}</li>
+                                            ))}
+                                        </ul>
                                     </div>
                                 </>
                             ) : (

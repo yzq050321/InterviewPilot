@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from uuid import UUID
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Interview, Message, Evaluation, JobPosting
@@ -49,17 +50,22 @@ from app.job_routes import router as job_router
 from app.structured_interview import stage_after_answer, CLOSING_MESSAGE, QUESTION_LIMIT
 from app.admin_workflow import router as admin_workflow_router
 from app.demo_routes import router as demo_router
+from app.pipeline import router as pipeline_router
 from app.evaluation_workflow import get_evaluation_state, generate_and_store_report
+from app.model_usage import model_usage_scope, link_interview_to_trace
+from app.answer_idempotency import reserve_attempt, fail_attempt, has_active_attempt
 
 # 创建 FastAPI 应用
 app = FastAPI(
     title="InterviewPilot API",
-    version="1.0.0"
+    description="AI 面试与招聘管理系统后端：岗位邀请、结构化面试、证据评估、招聘跟进与人工复核。",
+    version="2.1.0",
 )
 
 app.include_router(job_router)
 app.include_router(admin_workflow_router)
 app.include_router(demo_router)
+app.include_router(pipeline_router)
 
 candidate_bearer = HTTPBearer(auto_error=False)
 
@@ -82,12 +88,14 @@ def home():
         "message": "Welcome to InterviewPilot API"
     }
 
-# 健康检查接口：访问 /health
+# 健康检查接口：/health 供本机探活，/api/health 供 Nginx 反代后的公网探活。
 @app.get("/health")
+@app.get("/api/health", include_in_schema=False)
 def health_check():
     return {
         "status": "ok",
-        "message": "InterviewPilot backend is running!"
+        "service": "interviewpilot-api",
+        "version": app.version,
     }
 
 
@@ -179,11 +187,12 @@ async def create_interview(
 
     # 2. 调用 DeepSeek 生成第一道面试题
     try:
-        question = await run_in_threadpool(
-            generate_question_agent,
-            request.position,
-            request.difficulty
-        )
+        with model_usage_scope(stage="first_question") as usage_trace:
+            question = await run_in_threadpool(
+                generate_question_agent,
+                request.position,
+                request.difficulty
+            )
 
     except APITimeoutError:
         logger.exception("DeepSeek 生成面试题超时")
@@ -229,9 +238,11 @@ async def create_interview(
         )
 
         db.add(message)
+        db.flush()
 
         # 提交事务，一起保存面试和问题
         db.commit()
+        link_interview_to_trace(usage_trace, interview.id)
 
         # 3. 返回创建结果
         
@@ -241,7 +252,8 @@ async def create_interview(
             "candidate_name": interview.candidate_name,
             "position": interview.position,
             "difficulty": interview.difficulty,
-            "question": question
+            "question": question,
+            "question_id": message.id,
         }
 
     
@@ -261,7 +273,9 @@ class AnswerRequest(BaseModel):
     interview_id: int = Field(gt=0)
 
     # 用户对当前问题的回答
-    answer: str = Field(min_length=1)
+    answer: str = Field(min_length=1, max_length=8000)
+    request_id: UUID | None = None
+    question_id: int | None = Field(default=None, gt=0)
 
 # AI 动态追问接口
 @app.post("/api/interviews/followup")
@@ -297,23 +311,6 @@ async def interview_followup(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if interview.status != "in_progress":
-        raise HTTPException(
-            status_code=400,
-            detail="当前面试已结束"
-        )
-
-    # 招聘任务结构化面试最多八次候选人回答：四维、每维两次。
-    if interview.job_id is not None:
-        answered = db.scalars(
-            select(Message.id).where(
-                Message.interview_id == interview.id,
-                Message.role == "user",
-            )
-        ).all()
-        if len(answered) >= QUESTION_LIMIT:
-            raise HTTPException(status_code=409, detail="面试问题已全部回答，请结束面试")
-
     # 2. 查询这场面试最近的一道 AI 问题
     stmt = (
         select(Message)
@@ -332,6 +329,31 @@ async def interview_followup(
             status_code=400,
             detail="当前面试还没有问题"
         )
+
+    current_answer = request.answer.strip()
+    if not current_answer:
+        raise HTTPException(422, "回答内容不能为空")
+    reserved = reserve_attempt(
+        db, interview, last_question, request.request_id, request.question_id, current_answer
+    )
+    if isinstance(reserved, dict):
+        return reserved
+    attempt = reserved
+
+    # First successful claim only: check limit before LLM call.
+    # Existing attempts can still replay their committed result.
+    # 招聘任务结构化面试最多八次候选人回答：四维、每维两次。
+    if interview.job_id is not None:
+        answered = db.scalars(
+            select(Message.id).where(
+                Message.interview_id == interview.id,
+                Message.role == "user",
+            )
+        ).all()
+        if len(answered) >= QUESTION_LIMIT:
+            fail_attempt(db, attempt)
+            raise HTTPException(status_code=409, detail="面试问题已全部回答，请结束面试")
+
 
 
     # 3. 查询历史消息并调用 DeepSeek 生成追问
@@ -357,7 +379,7 @@ async def interview_followup(
         # 将用户本次回答加入上下文
         history.append({
             "role": "user",
-            "content": request.answer
+            "content": current_answer
         })
 
         # 邀请面试的提问维度由后端控制，避免模型一直只问技术题。
@@ -366,27 +388,34 @@ async def interview_followup(
         answer_count = sum(1 for item in history if item["role"] == "user")
         next_stage = stage_after_answer(answer_count) if interview.job_id is not None else None
 
-        if next_stage == "finished":
-            # 第八次回答后不额外调用模型，提示候选人提交完成。
-            next_question = CLOSING_MESSAGE
-        elif next_stage in (None, "technical_followup"):
-            args = (interview.position, interview.difficulty, history)
-            if requirements:
-                args += (requirements,)
-            next_question = await run_in_threadpool(generate_followup_agent, *args)
-        else:
-            next_question = await run_in_threadpool(
-                generate_competency_question_agent,
-                interview.position,
-                interview.difficulty,
-                requirements,
-                next_stage,
-                history,
-            )
+        with model_usage_scope(
+            stage="followup" if next_stage in (None, "technical_followup") else (next_stage or "closing"),
+            interview_id=interview.id,
+            job_id=interview.job_id,
+        ):
+            if next_stage == "finished":
+                # 第八次回答后不额外调用模型，提示候选人提交完成。
+                next_question = CLOSING_MESSAGE
+            elif next_stage in (None, "technical_followup"):
+                args = (interview.position, interview.difficulty, history)
+                if requirements:
+                    args += (requirements,)
+                next_question = await run_in_threadpool(generate_followup_agent, *args)
+            else:
+                next_question = await run_in_threadpool(
+                    generate_competency_question_agent,
+                    interview.position,
+                    interview.difficulty,
+                    requirements,
+                    next_stage,
+                    history,
+                )
 
     except HTTPException:
+        fail_attempt(db, attempt)
         raise
     except Exception:
+        fail_attempt(db, attempt)
         logger.exception("生成下一道面试题失败")
         raise HTTPException(
             status_code=502,
@@ -400,7 +429,7 @@ async def interview_followup(
         user_message = Message(
             interview_id=interview.id,
             role="user",
-            content=request.answer
+            content=current_answer
         )
 
         ai_message = Message(
@@ -409,27 +438,40 @@ async def interview_followup(
             content=next_question
         )
 
-        db.add_all([
-            user_message,
-            ai_message
-        ])
-
-        # 同一事务提交两条消息
+        db.add_all([user_message, ai_message])
+        db.flush()
+        # Save response and answer messages in ONE transaction.
+        claimed = db.execute(
+            update(type(attempt)).where(
+                type(attempt).id == attempt.id,
+                type(attempt).status == "processing",
+                type(attempt).started_at == attempt.started_at,
+            ).values(
+                status="done", next_question=next_question,
+                next_question_id=ai_message.id, next_stage=next_stage,
+            )
+        )
+        if claimed.rowcount != 1:
+            db.rollback()
+            raise HTTPException(409, "该提交已被其他请求接管，请刷新面试状态")
         db.commit()
 
         return {
             "interview_id": interview.id,
             "next_question": next_question,
+            "question_id": ai_message.id,
             "finished_questions": next_stage == "finished",
             "interview_stage": next_stage,
+            "replayed": False,
         }
 
-    except Exception:
+    except HTTPException:
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail="保存面试消息失败"
-        )
+        raise
+    except Exception:
+        fail_attempt(db, attempt)
+        logger.exception("保存面试消息失败")
+        raise HTTPException(500, "保存面试消息失败")
 
 
 @app.get("/api/interviews")
@@ -617,6 +659,10 @@ def complete_interview(
             detail="无权结束该场面试",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Prevent ending the interview while an answer is still being generated.
+    if has_active_attempt(db, interview.id):
+        raise HTTPException(409, "正在生成追问，请先等待本次回答完成")
 
     # 2. 检查面试是否已经结束
     if interview.status == "completed":

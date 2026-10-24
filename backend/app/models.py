@@ -1,6 +1,6 @@
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, JSON, Boolean
+from sqlalchemy import Column, Integer, JSON, Boolean, UniqueConstraint
 from sqlalchemy import (
     String,
     Text,
@@ -76,6 +76,11 @@ class Interview(Base):
     review_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Batch 9：人工招聘流程阶段，独立于 AI 评估和人工复核状态。
+    recruitment_stage: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="new", server_default="new"
+    )
 
     # 一场面试对应多条消息
     messages: Mapped[list["Message"]] = relationship(
@@ -253,3 +258,44 @@ class JobPosting(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+    # Batch 10A: 邀请链接到期时间，以 UTC naive DATETIME 存储。
+    invite_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+class InterviewFollowup(Base):
+    """Append-only HR follow-up log. Does not change the candidate's AI report."""
+    __tablename__ = "interview_followups"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    interview_id: Mapped[int] = mapped_column(
+        ForeignKey("interviews.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    old_stage: Mapped[str] = mapped_column(String(24), nullable=False)
+    new_stage: Mapped[str] = mapped_column(String(24), nullable=False)
+    note: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+
+class AnswerAttempt(Base):
+    """One durable candidate answer attempt per interview question."""
+    __tablename__ = "interview_answer_attempts"
+    __table_args__ = (
+        UniqueConstraint("interview_id", "question_id", name="uq_answer_attempt_question"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    interview_id: Mapped[int] = mapped_column(
+        ForeignKey("interviews.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question_id: Mapped[int] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), nullable=False
+    )
+    request_id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True)
+    answer_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    next_question_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    next_question: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_stage: Mapped[str | None] = mapped_column(String(32), nullable=True)

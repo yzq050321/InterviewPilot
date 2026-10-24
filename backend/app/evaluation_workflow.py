@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Evaluation, Interview, JobPosting, Message
+from app.model_usage import model_usage_scope
 
 logger = logging.getLogger(__name__)
 LEASE_MINUTES = 15
@@ -109,9 +110,11 @@ async def generate_and_store_report(
             db.rollback()
             raise HTTPException(status_code=409, detail="报告正在生成，请稍后刷新")
         db.commit()
+        job_id = interview.job_id
 
     try:
-        report = await run_in_threadpool(generator, **kwargs)
+        with model_usage_scope(stage="evaluation", interview_id=interview_id, job_id=job_id):
+            report = await run_in_threadpool(generator, **kwargs)
     except Exception:
         logger.exception("AI 评估生成失败，面试编号=%s", interview_id)
         _fail_claim(interview_id, stamp, "AI 生成失败，可重试", session_factory)

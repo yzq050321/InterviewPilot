@@ -1,0 +1,22 @@
+.pipeline-panel { margin: 22px 0; padding: 20px; border: 1px solid #e3e4f7; border-radius: 16px; background: #fafaff; }
+.pipeline-panel h3 { margin: 0 0 8px; }
+.pipeline-panel p { color: #566582; overflow-wrap: anywhere; }
+.pipeline-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin: 16px 0; }
+.pipeline-controls label { display: flex; flex-direction: column; gap: 7px; font-weight: 600; flex: 1 1 175px; }
+.pipeline-controls select, .pipeline-controls textarea { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid #d5daf0; border-radius: 10px; padding: 12px; background: white; font: inherit; }
+.pipeline-controls label.pipeline-note { flex: 3 1 270px; }
+.pipeline-controls button { padding: 12px 18px; min-height: 44px; border: 0; border-radius: 10px; color: white; background: #6350e9; cursor: pointer; }
+.pipeline-controls button:disabled { cursor: wait; opacity: .55; }
+.pipeline-history { list-style: none; padding: 0; margin: 12px 0 0; }
+.pipeline-history li { padding: 12px 0; border-top: 1px solid #e7e8f5; overflow-wrap: anywhere; }
+.pipeline-history time { font-size: 12px; color: #64748b; }
+.pipeline-error { color: #b42318 !important; }
+.pipeline-tag { padding: 4px 8px; background: #f0edff; border-radius: 8px; color: #4c3cb9; font-size: 13px; white-space: nowrap; }
+.pipeline-filter { box-sizing: border-box; min-width: 160px; max-width: 100%; min-height: 42px; border: 1px solid #dce0f1; border-radius: 10px; background: white; color: #25345c; padding: 8px; font: inherit; }
+@media (max-width: 640px) {
+ .pipeline-panel { padding: 14px; }
+ .pipeline-controls { display: grid; grid-template-columns: minmax(0,1fr); }
+ .pipeline-controls label, .pipeline-controls label.pipeline-note { min-width: 0; }
+ .pipeline-controls button { width: 100%; }
+ .pipeline-filter { width: 100%; }
+}

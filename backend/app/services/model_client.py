@@ -4,6 +4,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+from app.model_usage import usage_callback
 
 
 # 找到 backend 目录
@@ -23,5 +24,6 @@ llm = ChatOpenAI(
     ),
     temperature=0.7,
     timeout=30,
-    max_retries=2
+    max_retries=2,
+    callbacks=[usage_callback],
 )

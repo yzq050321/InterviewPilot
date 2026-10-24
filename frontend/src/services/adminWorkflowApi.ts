@@ -1,5 +1,5 @@
 /** HR-only evaluation recovery / review workflow. Candidate endpoints never use these APIs. */
-const API_BASE = import.meta.env.DEV ? "http://127.0.0.1:8000" : "";
+const API_BASE = "";
 
 export type EvaluationStatus = "not_started" | "pending" | "generating" | "failed" | "ready";
 export type ReviewStatus = "pending" | "reviewed" | "follow_up";
