@@ -1067,6 +1067,18 @@
   overflow-wrap: anywhere;
 }
 
+.admin-evaluation-list {
+  margin: 0;
+  padding-left: 22px;
+  color: #53617a;
+  font-size: 14px;
+  line-height: 2;
+}
+
+.admin-evaluation-list li + li {
+  margin-top: 4px;
+}
+
 /* 1. AI 综合评价：紫色 */
 .admin-evaluation-section:nth-of-type(2) {
   background: #f8f7ff;

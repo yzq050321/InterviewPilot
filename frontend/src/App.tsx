@@ -39,7 +39,7 @@ function App() {
   const routeInterviewId = interviewMatch?.params.id;
   const chatRef = useRef<HTMLElement | null>(null);
   const [candidateName, setCandidateName] = useState("");
-  const [position, setPosition] = useState("Java后端开发实习生");
+  const [position, setPosition] = useState("Python 后端开发实习生");
   const [difficulty, setDifficulty] = useState<Difficulty>("中等");
   const [interviewId, setInterviewId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);

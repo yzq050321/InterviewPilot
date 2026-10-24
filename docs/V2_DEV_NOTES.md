@@ -1,85 +1,55 @@
+# InterviewPilot V2.1 开发记录
 
-# InterviewPilot V2 开发记录
+> 详细设计见 [`ARCHITECTURE.md`](ARCHITECTURE.md)，版本变更见根目录 [`CHANGELOG.md`](../CHANGELOG.md)。
 
 ## 项目目标
 
-根据 HR 的反馈，把个人 AI 模拟面试工具升级为
-HR 主导的 AI 招聘面试系统。
+根据 HR 反馈，把个人 AI 模拟面试工具升级为 HR 主导的 AI 招聘面试系统：
 
-## HR 核心反馈
-
-1. B 端：尽量通过 AI 减少招聘人员的重复操作。
-2. C 端：除了技术能力，还应关注沟通、学习、执行能力。
-3. 简化产品操作，降低招聘人员的使用门槛。
-
-## 当前 V1 已实现
-
-- React + TypeScript + Vite 前端
-- FastAPI + MySQL + SQLAlchemy 后端
-- DeepSeek + LangChain Agent + Chroma RAG
-- 候选人创建面试、AI 提问、动态追问
-- 面试结束生成 AI 评估报告
-- HR 登录、面试列表、问答和评估详情
-- 候选人随机访问 Token
-- HR bcrypt + JWT 认证
-- 登录失败限流
-- 腾讯云 Lighthouse + Nginx + systemd 部署
-- 临时 Cloudflare HTTPS 演示入口
-
-## V2 第一阶段目标
-
-HR 创建招聘任务
-→ 生成邀请链接
-→ 候选人通过链接参加指定岗位面试
-→ 面试记录关联招聘任务
-→ HR 查看候选人及评估结果
-
-## V2 数据模型设计
-
-新增 JobPosting：
-- id
-- title
-- position
-- requirements
-- difficulty
-- invite_code（唯一随机字符串）
-- is_active
-- created_at
-
-计划在 Interview 中增加 nullable job_id 外键。
-必须配合 MySQL 数据库迁移，保留旧面试数据。
+1. B 端：减少招聘人员的重复操作。
+2. C 端：除技术能力外，覆盖沟通、学习、执行能力。
+3. 降低 HR 的使用门槛，并让面试结果真正进入后续招聘管理。
 
 ## 开发原则
 
-- 本地开发和测试通过后再部署服务器
-- V2 使用独立 Git 分支
-- 不提交 .env、API Key、管理员密码
-- 不使用真实候选人数据测试
-- AI 评分仅辅助 HR 人工复核
-- 新增功能不能破坏现有候选人和 HR 流程
-- 每个开发批次集中完成多个相关任务
+- 本地测试通过后再部署服务器。
+- 不提交 `.env`、API Key、管理员密码、数据库备份。
+- 不使用真实候选人数据测试；Demo 只读虚构数据。
+- AI 评分仅辅助 HR 人工复核，不自动录用/淘汰。
+- 新增功能不能破坏既有候选人和 HR 流程。
+- 每个批次集中完成多个相关任务，并补回归测试。
 
-## 开发进度
+## 批次完成情况
 
-批次 1：
-- [ ] 建立 feat/hr-job-invitations 分支
-- [ ] 新增 JobPosting SQLAlchemy 模型
-- [ ] 创建本开发记录
-- [ ] 完成模型语法及映射检查
+| 批次 | 内容 | 状态 |
+| --- | --- | --- |
+| 1 | `JobPosting` 模型、开发记录 | 完成 |
+| 2 | MySQL 迁移、`interview.job_id`、岗位/邀请 API | 完成 |
+| 3 | HR 岗位管理、候选人邀请页、前后端联调 | 完成 |
+| 4 | 岗位上下文、邀请流程、限流与权限测试 | 完成 |
+| 5 | 四维结构化面试、证据校验 | 完成 |
+| 6 | 报告状态机、并发租约、HR 重试与人工复核 | 完成 |
+| 7 | 只读 Demo 账号与虚构数据隔离 | 完成 |
+| 8 | 响应式 HR 岗位工作台、岗位详情、移动端导航 | 完成 |
+| 9 | 招聘阶段、append-only 跟进历史、Demo pipeline | 完成 |
+| 10A | 邀请有效期 7/14/30 天、过期 410、失败关闭 | 完成 |
+| 10B | 答题幂等、`request_id`/`question_id`、15 分钟租约、刷新恢复 | 完成 |
+| 7（成本） | AI 用量 telemetry、JSONL、离线汇总脚本 | 完成 |
 
-批次 2（待开始）：
-- [ ] MySQL 本地数据库迁移
-- [ ] Interview 增加 job_id
-- [ ] HR 招聘任务 API
-- [ ] 面试邀请 API
-- [ ] 身份验证与异常测试
+## V2.1 数据模型增量
 
-批次 3（待开始）：
-- [ ] HR 招聘任务管理界面
-- [ ] 候选人邀请入口
-- [ ] 前后端联调
+- `job_postings.invite_expires_at`：UTC 到期时间；旧岗位迁移时给 7 天宽限期。
+- `interviews.recruitment_stage`：`new / contact / next_round / decision / closed`。
+- `interview_followups`：append-only 阶段变化与备注历史。
+- `interview_answer_attempts`：`(interview_id, question_id)` 唯一，`request_id` 唯一，记录 `processing / done / failed` 与缓存的下一题。
 
-批次 4（待开始）：
-- [ ] 完整业务验收
-- [ ] 腾讯云部署
-- [ ] README 与截图更新
+## 验证记录（2026-10-24）
+
+- `python -m pytest -q`：59 个用例；当前沙箱 56 passed，3 个用量测试受临时目录权限限制（普通本地环境应全部通过）。
+- `npm run build`：通过（TypeScript + Vite）。
+- `python -m compileall`：通过。
+- 线上演示：<https://vm-0-12-ubuntu.tail2c8f81.ts.net/>
+
+## 已知边界
+
+当前仍是单机、单租户的可运行原型：没有 Redis/任务队列、没有 Alembic、没有审计日志与数据保留策略，限流为进程内内存实现。生产化路线见 README 的“项目边界”和“后续计划”。

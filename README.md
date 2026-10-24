@@ -1,165 +1,486 @@
-# InterviewPilot — AI 智能面试与招聘管理系统
+# InterviewPilot · AI 面试与招聘管理系统
 
-> 面向招聘初筛场景的全栈 AI 应用原型：**HR 发布招聘任务 → 生成邀请链接 → 候选人参与结构化 AI 面试 → 生成辅助评估报告 → HR 人工复核**。
->
-> **项目定位：**个人独立开发及业务试点探索项目，当前用于技术展示和模拟招聘流程；AI 评估仅供人工参考，不应用作自动录用、淘汰或其他高影响招聘决定。
+> 面向企业招聘初筛的全栈 AI 应用：把 **HR 创建岗位 → 邀请候选人 → 8 轮四维 AI 面试 → 带证据的辅助评估 → 招聘阶段与人工复核** 串成一条可运行的业务闭环。
 
-**在线演示：** https://vm-0-12-ubuntu.tail2c8f81.ts.net/  
-**HR 登录入口：** https://vm-0-12-ubuntu.tail2c8f81.ts.net/admin/login  
-**GitHub V2 开发分支：** [`feat/hr-job-invitations`](https://github.com/yzq050321/InterviewPilot/tree/feat/hr-job-invitations)
+[在线演示](https://vm-0-12-ubuntu.tail2c8f81.ts.net/) · [HR 入口](https://vm-0-12-ubuntu.tail2c8f81.ts.net/admin/login) · [架构说明](docs/ARCHITECTURE.md) · [GitHub](https://github.com/yzq050321/InterviewPilot)
 
-演示站点运行在腾讯云服务器上，通过 Tailscale Funnel 提供 HTTPS 访问。演示入口可能受服务器及隧道运行状态影响。独立的 HR Demo 账号仅能查看**虚构样例数据**，如需体验请向项目维护者索取临时演示凭证；不公开正式管理员凭证。
+![InterviewPilot 首页](docs/candidate-home.png)
 
-## 项目功能
+> 项目为个人独立开发的可运行原型，用于技术展示与业务流程验证。AI 评估仅作为 HR 的辅助材料，不用于自动录用、自动淘汰或其他高影响招聘决策。
 
-### HR 招聘管理端
+## 目录
 
-- **招聘任务管理：**创建、查看和管理招聘岗位，配置岗位名称、岗位要求与面试难度，生成候选人专属招聘邀请入口。
-- **候选人管理：**搜索和筛选面试记录，查看面试状态、AI 报告生成状态和 HR 人工复核状态。
-- **面试详情：**按顺序查看完整问答、技术与情境能力评估、证据及改进建议。
-- **人工复核：**由 HR 记录审核状态及备注，AI 评分仅作为辅助信息。
-- **报告状态与恢复：**对生成中、已完成及失败状态进行跟踪，支持符合条件的重试，减少重复生成问题。
-- **独立演示身份：**只读 Demo 工作台使用预置虚构任务、候选人和报告，不查询真实 MySQL 招聘数据，也不触发 AI 调用。
+- [为什么做这个项目](#为什么做这个项目)
+- [V2.1 新增能力](#v21-新增能力)
+- [界面预览](#界面预览)
+- [核心流程](#核心流程)
+- [关键设计](#关键设计)
+- [技术栈](#技术栈)
+- [数据模型](#数据模型)
+- [主要接口](#主要接口)
+- [本地运行](#本地运行)
+- [测试与验证](#测试与验证)
+- [部署拓扑](#部署拓扑)
+- [项目边界](#项目边界)
+- [后续计划](#后续计划)
 
-### 候选人面试端
+## 为什么做这个项目
 
-- 通过 HR 邀请链接进入对应岗位的 AI 面试；根据招聘任务要求进行**八道结构化题目**，覆盖技术理解、沟通、学习和执行等维度。
-- 根据此前回答组织上下文与动态追问，支持主动结束面试。
-- 使用每场面试独立的随机访问凭证保护会话；候选人端不展示 HR 专用评分及完整评估报告。
+很多“AI 面试”项目停留在 **输入岗位 → 生成问题 → 返回答案** 的三步 Demo。真实招聘初筛至少还涉及五类工程问题：
 
-### 大语言模型与知识检索
+1. **岗位上下文**：问题必须围绕具体 JD，而不是泛泛地背诵八股文。
+2. **流程可控**：一场面试要覆盖技术、沟通、学习、执行四个维度，不能由模型自由发挥到哪算哪。
+3. **评估可信**：分数必须能回到候选人的原话；模型编造的证据不能被 HR 当成事实。
+4. **招聘流程**：面试结束后，HR 还需要记录招聘阶段、跟进备注和邀请有效期，而不是只看一份 AI 报告。
+5. **失败可恢复**：模型超时、报告生成失败、候选人重复提交、HR 重复点击、候选人越权访问，都不能破坏招聘流程。
 
-- **DeepSeek + LangChain：**生成面试题、动态追问及辅助评估。
-- **RAG：**通过 Qwen Embedding 和 Chroma 对技术文档进行向量化检索。
-- **Tool Calling：**在需要时让面试 Agent 调用知识检索工具，辅助组织相关技术问题。
-- 当前知识库以部分 Python 后端相关知识为主，属于小规模验证，尚未形成覆盖全部岗位的企业级知识库。
+InterviewPilot 把这些问题落到 **数据库约束、后端状态机、鉴权边界和自动化测试** 中，而不是只靠一段更长的 Prompt。
 
-## 页面预览
+## V2.1 新增能力
 
-以下截图来自项目早期的页面展示，部分功能与样式可能已随 V2 迭代发生变化；正式投递前建议替换为最新截图，并使用虚构测试数据。
+### 1. HR 招聘工作台
+
+- 岗位工作台汇总：开放岗位、岗位关联面试、待人工复核、报告失败待处理。
+- 按岗位名称/编号搜索，按“招聘中 / 已停用”筛选；岗位详情页按候选人、面试状态、报告状态、招聘阶段筛选。
+- 新建岗位内置 Python 后端、前端、AI 应用、产品四个模板；创建时选择 **7 / 14 / 30 天**邀请有效期。
+- 响应式布局 + 移动端底部导航，HR 在手机上也能查看岗位和面试。
+
+### 2. 招聘阶段与人工跟进
+
+- 候选人面试结束后，HR 可以更新招聘阶段：`new → contact → next_round → decision → closed`。
+- 每次更新必须写跟进备注，形成 **append-only 历史**；备注不会被覆盖，方便回溯。
+- 招聘阶段与 AI 评估、`review_status` 完全独立：AI 不参与招聘决策，阶段只由 HR 手动更新。
+- 更新时对面试行 `SELECT ... FOR UPDATE`，把“读旧阶段 + 写历史 + 更新阶段”放在同一事务里。
+
+### 3. 邀请链接有效期
+
+- 创建岗位时选择 7 / 14 / 30 天；数据库保存 UTC `invite_expires_at`。
+- 过期后：邀请页和创建面试接口返回 `410`，且 **在 AI 调用前就拒绝**，不浪费模型费用。
+- 已创建的面试不受影响；停用岗位仍返回 `404`，与“过期”区分。
+- 迁移后旧岗位默认获得 7 天宽限期；`NULL` 防御性地视为不可用（fail closed）。
+
+### 4. 答题幂等与刷新恢复
+
+- 前端为每道未确认的题生成 `request_id`，把 `{request_id, question_id, answer}` 存在 `sessionStorage`；刷新后可以用同一标识重试。
+- 后端 `interview_answer_attempts` 表对 `(interview_id, question_id)` 加唯一约束，`request_id` 也唯一；先落库占位，再调用模型。
+- 同一请求重放时直接返回已保存的下一题，不再调用模型；不同请求抢同一道题返回 `409`。
+- 15 分钟租约允许失败/崩溃后重试；有未完成的答题时，结束面试返回 `409`，避免报告漏掉正在生成的回答。
+
+### 5. AI 用量记录
+
+- 通过 `MODEL_USAGE_ENABLED=1` 选择性开启；默认关闭。
+- 记录每次模型调用的 stage、trace_id、interview_id/job_id、输入/输出 Token、耗时、模型名和估算费用。
+- 只写 JSONL 元数据，**不记录消息正文、API Key、邀请码或原始响应**；写日志失败不会中断面试。
+- `tools/model_usage_report.py` 可按面试/阶段汇总调用次数、失败次数、Token 和估算费用，用于成本分析。
+
+## 界面预览
 
 | 候选人首页 | AI 面试问答 |
 | --- | --- |
-| ![候选人入口](docs/candidate-home.png) | ![AI 面试问答](docs/ai-interview.png) |
+| ![候选人首页](docs/candidate-home.png) | ![AI 面试问答](docs/ai-interview.png) |
 
-| HR 招聘后台 | HR 评估报告 |
+| HR 招聘工作台 | 四维评估报告 |
 | --- | --- |
-| ![HR 招聘管理](docs/hr-dashboard.png) | ![HR 评估报告](docs/hr-report.png) |
+| ![HR 招聘工作台](docs/hr-dashboard.png) | ![评估报告](docs/hr-report.png) |
 
-## 典型业务流程
+> 截图为本地演示数据；V2.1 新增的招聘阶段、邀请有效期和用量记录在岗位详情/面试详情/运维脚本中体现。
+
+## 核心流程
+
+```mermaid
+flowchart LR
+    A[HR 创建岗位<br/>JD + 难度 + 有效期] --> B[生成随机邀请码]
+    B --> C[候选人打开邀请链接]
+    C --> D{邀请有效?}
+    D -- 否 --> E[410 已过期]
+    D -- 是 --> F[服务端绑定岗位上下文]
+    F --> G[创建 8 轮结构化面试]
+    G --> H[LangChain Agent<br/>按需调用 Chroma 检索]
+    H --> I[DeepSeek 生成下一题]
+    I --> J[答题幂等占位 + 持久化]
+    J --> K{8 轮完成?}
+    K -- 否 --> H
+    K -- 是 --> L[候选人结束面试]
+    L --> M[原子领取报告生成槽位]
+    M --> N[生成四维评估 + 证据校验]
+    N --> O[HR 查看报告]
+    O --> P[招聘阶段 + 跟进备注]
+    P --> Q[人工复核]
+```
+
+### 一次邀请面试的状态
 
 ```text
-HR 创建招聘任务并生成邀请链接
-                ↓
-候选人进入岗位面试 → 服务器校验会话凭证
-                ↓
-FastAPI 组织岗位要求 / 既有问答 / 阶段信息
-                ↓
-LangChain + DeepSeek（按需查询 RAG 知识）
-                ↓
-SQLAlchemy / MySQL 持久化面试与问答
-                ↓
-候选人结束面试 → AI 评估状态跟踪与报告生成
-                ↓
-HR 查看报告、核对回答证据并人工复核
+岗位: Python 后端实习生（邀请有效期 7 天）
+  ↓ 邀请码校验 + 服务端绑定难度/岗位要求
+第 1 问: 技术首题
+第 2 问: 技术追问（携带完整历史）
+第 3 问: 沟通情境题
+第 4 问: 沟通追问
+第 5 问: 学习情境题
+第 6 问: 学习追问
+第 7 问: 执行情境题
+第 8 问: 执行追问
+  ↓ 候选人结束面试
+报告: pending → generating → ready / failed
+  ↓
+HR: 招聘阶段 new → contact → next_round → decision → closed
+  ↓
+人工复核: pending → reviewed / follow_up（与招聘阶段独立）
 ```
 
-## 技术架构
+## 关键设计
 
-| 层次 | 实现 |
+### 1. 岗位上下文由服务端绑定
+
+候选人只提交姓名；岗位、岗位要求、难度全部来自邀请码对应的 `job_postings` 记录。这样既保证同一岗位的候选人被一致地评估，也避免候选人自行降低难度或替换岗位。AI 调用后还会再查一次岗位是否停用/过期，防止 HR 在生成题目期间改变状态。
+
+- **取舍**：邀请码是共享凭证，因此额外做了“单邀请 5 次/分钟、20 次/小时”的创建限流。
+- **代码**：`backend/app/job_routes.py`
+
+### 2. 四维面试用状态机，而不是让模型自由决定考什么
+
+`stage_after_answer(n)` 根据已回答数量返回下一题类型：
+
+```python
+1 -> technical_followup
+2 -> communication_intro
+3 -> communication_followup
+4 -> learning_intro
+5 -> learning_followup
+6 -> execution_intro
+7 -> execution_followup
+8 -> finished
+```
+
+技术追问会把完整历史转成 LangChain 消息；软技能题由服务端选定“沟通/学习/执行”模板，模型只负责把模板具体化成一道题。这样能避免模型连续追问技术细节，导致四个维度覆盖不全。
+
+- **取舍**：结构化会牺牲一部分“自由对话”的灵活性，但换来可解释的覆盖度和可测试性。
+- **代码**：`backend/app/structured_interview.py`、`backend/app/services/agent_service.py`
+
+### 3. RAG 解决“问题脱离岗位知识”，同时守住数据/指令边界
+
+- 知识文档按 `chunk_size=300`、`chunk_overlap=50` 切分，写入 Chroma。
+- Agent 只暴露一个 `search_knowledge_tool`，由模型决定是否检索；检索结果作为 `ToolMessage` 回填，再生成最终问题。
+- 岗位要求用 JSON 编码并明确标注为“不可信参考数据”，降低把外部文本当成系统指令的风险。
+- **取舍**：当前知识库只有一份 Python 后端文档，规模很小；RAG 在这里主要验证“检索—工具调用—生成”的工程链路，而不是追求大规模知识覆盖。
+
+### 4. 评估分数必须能回到原话
+
+评估 Prompt 要求模型输出：
+
+```json
+{
+  "technical": {"score": 80, "evidence": "候选人原话片段", "observation": "...", "limitations": "..."},
+  "communication": {"score": 75, "evidence": "...", "observation": "...", "limitations": "..."},
+  "learning": {"score": 70, "evidence": "...", "observation": "...", "limitations": "..."},
+  "execution": {"score": 72, "evidence": "...", "observation": "...", "limitations": "..."}
+}
+```
+
+后端不会直接相信模型：
+
+1. `EvaluationReport` 用 Pydantic 限制字段、类型和 0–100 范围。
+2. `answers_by_dimension` 按真实回答顺序把第 1–2、3–4、5–6、7–8 条回答分组。
+3. `verify_competency_evidence` 要求 `evidence` 是对应维度原回答的逐字子串；不满足则 `score=None`，并写入“缺少可核验证据”的说明。
+4. 候选人端只能提交报告生成请求，不能读取分数；报告只对 HR 开放。
+
+- **取舍**：逐字匹配会误伤“模型做了轻微改写”的证据，但宁可漏评，也不把编造内容展示成“已核实”。
+- **代码**：`backend/app/services/evaluation_service.py`、`backend/app/structured_interview.py`
+
+### 5. 两个幂等：报告生成与答题提交
+
+**报告生成**：条件 `UPDATE` 原子领取 `generating` 槽位，15 分钟租约；失败写 `failed`，HR 可重试；写回前再次校验 `evaluation_started_at`，旧 worker 不能覆盖新结果。
+
+**答题提交**：`interview_answer_attempts` 对 `(interview_id, question_id)` 唯一；先用 `request_id` 落库占位并提交，再调用模型；成功后在同一事务里写两条消息并标记 `done`。同一 `request_id` 重放直接返回缓存结果，不重复计费。
+
+- **取舍**：两者都不是分布式任务队列；崩溃后的恢复是“可重试”，不是“自动续跑”。答题的 15 分钟租约也不能保证外部 LLM 的 exactly-once 计费。
+- **代码**：`backend/app/evaluation_workflow.py`、`backend/app/answer_idempotency.py`
+
+### 6. 招聘阶段与 AI 复核是两条独立状态
+
+- `recruitment_stage`：HR 手动更新的招聘流程状态，5 个阶段，配合 `interview_followups` 追加历史。
+- `review_status`：HR 对 AI 报告的复核状态，只有 `pending / reviewed / follow_up`。
+- AI 分数、招聘阶段、复核状态互不自动推导；报告明确写明“AI 仅辅助，不自动录用/淘汰”。
+
+- **代码**：`backend/app/pipeline.py`
+- **取舍**：阶段是“人记录的流程事实”，不是“AI 推断的结论”；这能避免把模型输出误当成招聘决定。
+
+### 7. AI 用量记录：可观测，但不碰隐私
+
+- `UsageCallback` 通过 LangChain callback 捕获每次模型调用；包括“工具决策”和“最终回答”两次调用。
+- 记录 `stage / trace_id / interview_id / job_id / input_tokens / output_tokens / elapsed_ms / model / estimated_cny`。
+- 失败调用 Token 未知时写 `null`，不伪造 0；日志写入失败只 warning，不影响面试。
+- **取舍**：费用是按单价估算，不是账单；Embedding、服务器、网络费用未计入。
+
+### 8. 三类身份，三条认证路径
+
+| 身份 | 凭证 | 能做什么 | 不能做什么 |
+| --- | --- | --- | --- |
+| HR 管理员 | bcrypt 密码 + 2 小时 JWT | 建岗、看所有面试、生成/重试报告、招聘阶段、人工复核 | 无 |
+| 候选人 | 每场面试随机 Token，库中存 SHA-256 | 只能读写自己的面试与问答 | 读取 HR 报告、访问他人面试 |
+| Demo 访客 | 独立 JWT，只读 | 查看预置虚构岗位/面试/报告/招聘阶段 | 访问真实 HR API、触发模型调用 |
+
+登录失败按 IP 做 5 次/5 分钟限流，触发后锁定 15 分钟；候选人 Token 只保存在当前标签页的 `sessionStorage`。
+
+## 技术栈
+
+| 层次 | 选型 |
 | --- | --- |
-| Web 前端 | React、TypeScript、Vite、React Router |
-| 后端 API | Python、FastAPI、Pydantic |
-| 数据持久化 | MySQL、SQLAlchemy |
-| 大模型与 Agent | DeepSeek、LangChain、Tool Calling |
-| 知识检索 | Qwen Embedding、Chroma |
-| 登录与授权 | bcrypt、JWT、候选人随机访问 Token、按身份限制 API |
-| 自动化测试 | pytest（关键招聘、面试和权限场景） |
+| 前端 | React 19、TypeScript、Vite、React Router、原生 CSS |
+| API | Python、FastAPI、Pydantic |
+| 数据层 | MySQL、SQLAlchemy 2.x、显式 SQL 迁移 |
+| LLM | DeepSeek Chat、LangChain、Tool Calling |
+| RAG | Qwen Embedding（DashScope）、Chroma |
+| 鉴权 | bcrypt、PyJWT、候选人 Token 哈希、角色隔离 |
+| 可观测 | LangChain callback、JSONL 用量日志、离线汇总脚本 |
+| 测试 | pytest、FastAPI TestClient、SQLite 内存库 |
 | 部署 | 腾讯云 Lighthouse、Ubuntu、Nginx、systemd、Tailscale Funnel |
 
-**安全边界：**正式管理员与只读 Demo 使用不同角色；Demo JWT 不能读取管理员招聘任务或真实候选人记录。候选人也不能通过猜测面试编号读取他人问答或 HR 评估内容。这些措施属于当前原型的基础防护，不代表系统已经通过企业生产环境的完整安全、合规与隐私审计。
+## 数据模型
 
-## 本地开发
+```mermaid
+erDiagram
+    JOB_POSTINGS ||--o{ INTERVIEWS : "job_id"
+    INTERVIEWS ||--o{ MESSAGES : "interview_id"
+    INTERVIEWS ||--o| EVALUATIONS : "interview_id"
+    INTERVIEWS ||--o{ INTERVIEW_FOLLOWUPS : "interview_id"
+    INTERVIEWS ||--o{ ANSWER_ATTEMPTS : "interview_id"
+    MESSAGES ||--o{ ANSWER_ATTEMPTS : "question_id"
 
-**前置要求：**Python、Node.js、MySQL，以及有权限使用的 DeepSeek / Embedding API 服务。具体版本以项目依赖清单为准。
-
-1. 获取源码并进入 `feat/hr-job-invitations` 分支：
-
-   ```bash
-   git clone https://github.com/yzq050321/InterviewPilot.git
-   cd InterviewPilot
-   git switch feat/hr-job-invitations
-   ```
-
-2. 创建并激活 Python 虚拟环境，在 `backend` 目录安装依赖：
-
-   ```bash
-   cd backend
-   python -m venv .venv
-   # Windows CMD: .venv\Scripts\activate
-   # Linux/macOS: source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-
-3. 根据 `backend/.env.example` 创建本地 `backend/.env` 并填入开发环境的数据库与 API 配置；还需设置 `ADMIN_USERNAME`、`ADMIN_PASSWORD_HASH` 与足够长度的随机 `ADMIN_JWT_SECRET`。如需启用只读 Demo，再配置 `DEMO_USERNAME` 和 `DEMO_PASSWORD_HASH`。所有密码哈希使用项目已有的 `hash_password` 工具生成，**不要提交真实密钥或 `.env`**。
-
-4. 创建独立的本地 MySQL 数据库，按项目当前数据库模型和 `backend/migrations/` 中的 SQL 迁移说明**依次**准备表结构。迁移前备份；每条已执行迁移不要重复运行。此项目目前不是一键自动迁移的全新数据库安装程序，请根据迁移文件检查依赖关系，不要直接在已有生产库上试验。
-
-5. 根据需要构建知识库，然后启动后端：
-
-   ```bash
-   python build_knowledge.py
-   python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
-   ```
-
-   本地接口文档： http://127.0.0.1:8000/docs
-
-6. 在另一个终端启动前端：
-
-   ```bash
-   cd frontend
-   npm ci
-   npm run dev
-   ```
-
-   浏览器访问 Vite 终端输出的本地地址（通常为 http://localhost:5173 ）。
-
-## 验证与测试
-
-在 `backend` 目录运行关键测试：
-
-```bash
-python -m pytest -q tests/test_job_routes_v2.py tests/test_batch4_job_context.py tests/test_batch4_flow.py tests/test_batch5_structured.py tests/test_batch6_workflow.py tests/test_demo_account.py
+    JOB_POSTINGS {
+        int id PK
+        string title
+        string position
+        text requirements
+        string difficulty
+        string invite_code UK
+        bool is_active
+        datetime invite_expires_at
+    }
+    INTERVIEWS {
+        int id PK
+        int job_id FK
+        string candidate_name
+        string candidate_token_hash UK
+        string status
+        string recruitment_stage
+        string evaluation_state
+        datetime evaluation_started_at
+        string review_status
+    }
+    MESSAGES {
+        int id PK
+        int interview_id FK
+        string role
+        text content
+    }
+    EVALUATIONS {
+        int id PK
+        int interview_id FK
+        int overall_score
+        json competency_assessment
+        text summary
+    }
+    INTERVIEW_FOLLOWUPS {
+        int id PK
+        int interview_id FK
+        string old_stage
+        string new_stage
+        text note
+    }
+    ANSWER_ATTEMPTS {
+        int id PK
+        int interview_id FK
+        int question_id FK
+        string request_id UK
+        string status
+        datetime started_at
+    }
 ```
 
-这组测试曾在 V2 演示验收时通过 **36 项**；是否继续通过以当前源码实际执行结果为准。前端生产构建：
+## 主要接口
+
+| 方法 | 路径 | 说明 | 鉴权 |
+| --- | --- | --- | --- |
+| POST | `/api/admin/login` | HR / Demo 登录 | 无 |
+| POST | `/api/admin/jobs` | 创建岗位、邀请码、有效期 | Admin JWT |
+| GET | `/api/admin/jobs` | 岗位列表与邀请截止时间 | Admin JWT |
+| PATCH | `/api/admin/jobs/{id}/deactivate` | 停用岗位 | Admin JWT |
+| GET | `/api/job-invitations/{code}` | 候选人查看邀请岗位 | 邀请码 |
+| POST | `/api/job-invitations/{code}/interviews` | 创建邀请面试 | 邀请码 + 限流 |
+| POST | `/api/interviews/followup` | 提交回答（`request_id` + `question_id`） | 候选人 Token |
+| PATCH | `/api/interviews/{id}/complete` | 结束面试 | 候选人 Token |
+| POST | `/api/interviews/{id}/evaluation` | 触发报告生成 | 候选人 Token |
+| GET | `/api/interviews/{id}/evaluation` | 读取报告 | Admin JWT |
+| POST | `/api/admin/interviews/{id}/evaluation/retry` | HR 重试报告 | Admin JWT |
+| PATCH | `/api/admin/interviews/{id}/review` | 报告人工复核 | Admin JWT |
+| GET | `/api/admin/pipeline` | 招聘阶段概览 | Admin JWT |
+| GET | `/api/admin/interviews/{id}/pipeline` | 阶段 + 跟进历史 | Admin JWT |
+| POST | `/api/admin/interviews/{id}/pipeline` | 更新阶段 + 追加备注 | Admin JWT |
+| GET | `/api/health` | 健康检查 | 无 |
+
+完整接口与请求模型见启动后的 Swagger：`http://127.0.0.1:8000/docs`。
+
+## 本地运行
+
+### 1. 环境要求
+
+- Python 3.11+
+- Node.js 20+
+- MySQL 8.x
+- 可用的 DeepSeek API Key
+- 可用的 DashScope Embedding API Key（仅 RAG 需要）
+
+### 2. 配置环境变量
+
+```bash
+cd backend
+cp .env.example .env
+```
+
+填写 `backend/.env`：
+
+```dotenv
+DEEPSEEK_API_KEY=your_api_key_here
+DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+
+DASHSCOPE_API_KEY=your_dashscope_key
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+
+DB_USER=interview_app
+DB_PASSWORD=your_database_password
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=interview_pilot
+
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH=replace_with_bcrypt_hash
+ADMIN_JWT_SECRET=replace_with_at_least_32_random_characters
+DEMO_USERNAME=demo
+DEMO_PASSWORD_HASH=replace_with_another_bcrypt_hash
+
+# 可选：AI 用量记录
+MODEL_USAGE_ENABLED=1
+MODEL_INPUT_CNY_PER_M=2
+MODEL_OUTPUT_CNY_PER_M=8
+```
+
+生成 bcrypt 哈希：
+
+```bash
+python -c "from app.admin_auth import hash_password; print(hash_password('your-password'))"
+```
+
+> 不要提交 `.env`、真实 API Key、管理员密码或数据库备份。
+
+### 3. 初始化数据库
+
+按 `backend/migrations/` 中的文件顺序执行增量迁移。项目没有引入 Alembic，迁移是显式 SQL；执行前请备份数据库。
+
+V2.1 新增：
+
+- `20261021_candidate_pipeline.sql`：`interviews.recruitment_stage` + `interview_followups`。
+- `20261022_invitation_expiry.sql`：`job_postings.invite_expires_at` + 旧岗位 7 天宽限期。
+- `20261022_answer_idempotency.sql`：`interview_answer_attempts` 表与唯一约束。
+
+### 4. 构建知识库并启动后端
+
+```bash
+cd backend
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+python build_knowledge.py
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+```
+
+### 5. 启动前端
 
 ```bash
 cd frontend
+npm ci
+npm run dev
+```
+
+Vite 已配置 `/api` 代理到 `127.0.0.1:8000`；生产构建：
+
+```bash
 npm run build
 ```
 
-发布前还应回归测试：招聘任务与邀请、完整面试、报告生成与失败重试、HR 人工复核，以及 Demo Token 无法访问真实管理员 API。
+## 测试与验证
 
-## 演示与部署说明
+后端测试使用 FastAPI `TestClient` + SQLite 内存库，模型调用通过 monkeypatch 替换，不消耗 API 额度、不写 MySQL：
 
-- 生产前端静态资源由 Nginx 托管，`/api` 请求反向代理到本机 FastAPI。
-- FastAPI 由 `interviewpilot.service` 管理，MySQL 用于存储业务记录。
-- 演示站点目前通过 **Tailscale Funnel** 提供固定格式的 HTTPS 访问地址，**并不代表配备独立购买的域名或生产级 SLA**。
-- 开发环境与服务器生产环境的前端 API 基地址可能不同；生产构建应使用同源 `/api` 路径，不要把本地 `127.0.0.1:8000` 打包到公网网页中。
-- 不公开正式管理员密码；如对外提供演示凭证，应限时使用并根据需要关闭 Demo 账号。
+```bash
+cd backend
+python -m pytest -q
+```
 
-## 现阶段限制与 V2.1 计划
+当前仓库包含 **59 个 pytest 用例**，覆盖：
 
-当前项目已完成可演示的招聘业务闭环，仍属于**业务试点原型**。正式用于企业招聘前还需进一步完善真实候选人授权、隐私保留与删除、审计日志、稳定性监控及多用户权限设计。
+- 邀请创建、邀请过期（410）、停用（404）、时长枚举校验；
+- 四维状态机、证据校验、早期结束；
+- 报告并发占位、失败恢复、15 分钟租约；
+- 答题幂等：重复 request_id 重放、旧题拒绝、失败重试、处理中拦截结束；
+- 招聘阶段：更新/历史/备注、Demo 隔离、合法阶段校验；
+- AI 用量：Token/费用记录、失败不伪造 0、禁用不写日志、上下文嵌套；
+- 管理员 / 候选人 / Demo 三类身份隔离。
 
-下一阶段围绕实际 HR 工作流重点推进：
+> 测试数量会随功能迭代变化；以 `pytest -q` 的实际输出为准。前端 `npm run build` 通过；`npm run lint` 目前仍有 5 条 React Hook 规范警告，非阻断项。
 
-- 按岗位组织招聘工作台、候选人进展和人工复核。
-- 记录 LLM 调用 Token、耗时和成本，对照不同低成本模型。
-- 优化面试报告证据展示、失败恢复及业务操作效率。
-- 对生产化需求进行额外的安全、隐私与可靠性验证。
+## 部署拓扑
 
-## 项目性质
+```text
+Internet
+  │ HTTPS
+  ▼
+Tailscale Funnel
+  │
+  ▼
+Nginx
+  ├── /            → frontend/dist（React 静态资源）
+  └── /api/        → 127.0.0.1:8000（FastAPI）
+                         │
+                         ├── MySQL 8（业务数据）
+                         ├── Chroma（本地向量库）
+                         ├── ~/.interviewpilot/model_usage.jsonl（可选）
+                         └── DeepSeek / DashScope API
+```
 
-InterviewPilot 是个人独立开发的 AI 应用项目。AI 对候选人回答所生成的分数和建议存在不确定性，应由 HR 结合岗位要求和其他材料进行人工复核；不建议把模型评分作为招聘自动化决策的唯一依据。
+- 后端由 systemd 管理，进程异常退出后自动拉起。
+- 演示站通过 Tailscale Funnel 提供 HTTPS 入口；地址受服务器和隧道状态影响。
+- 用量日志默认在运行用户家目录；生产建议配 logrotate 或改用集中日志。
+
+## 项目边界
+
+这是一个**可运行的业务原型**，不是可直接商用的招聘系统。当前明确不做或未完成：
+
+- 不做自动录用/淘汰，AI 分数只作辅助；报告必须经 HR 人工复核。
+- 没有企业多租户、SSO、审计日志、候选人数据保留/删除策略。
+- 限流是单进程内存实现，多进程/多机部署需要 Redis 或 API 网关；Nginx 反代下 `request.client.host` 可能是代理 IP，登录限流需要可信代理配置。
+- 报告生成是同步请求 + 数据库租约，不是消息队列/后台任务系统。
+- 知识库只有一份示例文档，RAG 规模与召回率尚未做系统评测。
+- 用量记录是按单价估算，不是云账单；Embedding/服务器费用未计入。
+- 没有调用成本看板、端到端浏览器测试和 CI/CD。
+
+把这些边界写清楚，是为了区分“已经验证的工程能力”和“尚未完成的生产化工作”。
+
+## 后续计划
+
+- [ ] 用 Alembic 管理迁移，补 CI（pytest + frontend build）。
+- [ ] 增加 AI 调用耗时/token 成本看板与异常告警。
+- [ ] 将报告生成迁移到后台任务队列，支持失败自动重试。
+- [ ] 扩充知识库与检索评测集，记录 Recall@K 与问题重复率。
+- [ ] 增加 Playwright 端到端测试与可访问性检查。
+- [ ] 邀请码改为一次性/可撤销，补候选人数据保留策略。
+
+## 作者
+
+杨增勤 · 惠州学院 · 数据科学与大数据技术（2023–2027）
+
+- GitHub：<https://github.com/yzq050321/InterviewPilot>
+- 演示：<https://vm-0-12-ubuntu.tail2c8f81.ts.net/>

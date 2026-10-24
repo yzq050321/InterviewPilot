@@ -58,7 +58,8 @@ from app.answer_idempotency import reserve_attempt, fail_attempt, has_active_att
 # 创建 FastAPI 应用
 app = FastAPI(
     title="InterviewPilot API",
-    version="1.0.0"
+    description="AI 面试与招聘管理系统后端：岗位邀请、结构化面试、证据评估、招聘跟进与人工复核。",
+    version="2.1.0",
 )
 
 app.include_router(job_router)
@@ -87,12 +88,14 @@ def home():
         "message": "Welcome to InterviewPilot API"
     }
 
-# 健康检查接口：访问 /health
+# 健康检查接口：/health 供本机探活，/api/health 供 Nginx 反代后的公网探活。
 @app.get("/health")
+@app.get("/api/health", include_in_schema=False)
 def health_check():
     return {
         "status": "ok",
-        "message": "InterviewPilot backend is running!"
+        "service": "interviewpilot-api",
+        "version": app.version,
     }
 
 

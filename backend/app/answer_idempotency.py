@@ -128,9 +128,13 @@ def fail_attempt(db: Session, attempt: AnswerAttempt) -> None:
 
 
 def has_active_attempt(db: Session, interview_id: int) -> bool:
+    # A crashed worker leaves a processing row behind. Only a non-expired
+    # attempt may block "complete"; otherwise the candidate could be stuck
+    # forever even though a retry is allowed after the lease.
     return db.scalar(
         select(AnswerAttempt.id).where(
             AnswerAttempt.interview_id == interview_id,
             AnswerAttempt.status == "processing",
+            AnswerAttempt.started_at > utc_now() - timedelta(seconds=LEASE_SECONDS),
         ).limit(1)
     ) is not None

@@ -172,3 +172,21 @@ def test_complete_blocked_while_turn_processing(ctx):
         "Authorization": f"Bearer {created['interview_token']}"
     })
     assert r.status_code == 409
+
+
+def test_stale_processing_attempt_does_not_block_complete(ctx):
+    client, maker, _calls, created = ctx
+    import hashlib
+    with maker() as db:
+        db.add(AnswerAttempt(
+            interview_id=created["interview_id"], question_id=created["question_id"],
+            request_id=str(uuid4()),
+            answer_hash=hashlib.sha256("崩溃残留".encode()).hexdigest(),
+            status="processing", started_at=utc_now() - timedelta(minutes=16),
+        ))
+        db.commit()
+    r = client.patch(f"/api/interviews/{created['interview_id']}/complete", headers={
+        "Authorization": f"Bearer {created['interview_token']}"
+    })
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "completed"

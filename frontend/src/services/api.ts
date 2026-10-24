@@ -386,9 +386,9 @@ export async function getAdminInterviewEvaluation(
   clarity_score: number;
   overall_score: number;
   summary: string;
-  strengths: string;
-  weaknesses: string;
-  suggestions: string;
+  strengths: string[];
+  weaknesses: string[];
+  suggestions: string[];
   created_at: string;
 }> {
   const token = sessionStorage.getItem("admin_token");

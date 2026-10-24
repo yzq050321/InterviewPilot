@@ -1,6 +1,8 @@
 
 # Python 虚拟环境
 .venv/
+.venv-uv/
+.uv-cache/
 
 # Python 缓存
 __pycache__/
@@ -28,10 +30,7 @@ chroma_db/
 
 *.sqlite3
 
-# Private database backups
+# Private database backups / dumps
 *.sql
-
-# Local environment secrets
-.env
-.env.*
-!.env.example
+# 迁移脚本是源码的一部分，必须能正常 git add
+!backend/migrations/*.sql
