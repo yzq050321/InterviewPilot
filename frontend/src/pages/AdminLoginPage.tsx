@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { loginAdmin } from "../services/api";
 
 export default function AdminLoginPage() {
@@ -41,7 +41,7 @@ export default function AdminLoginPage() {
                     <div className="card-icon">▣</div>
                     <div>
                         <h2>招聘管理后台</h2>
-                        <p>支持 HR 管理员及独立演示账号登录</p>
+                        <p>支持环境管理员、受邀 HR 邮箱账号和只读 Demo 登录</p>
                     </div>
                 </div>
 
@@ -53,7 +53,7 @@ export default function AdminLoginPage() {
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         autoComplete="username"
-                        placeholder="请输入HR 账号"
+                        placeholder="邮箱或管理员账号"
                     />
                 </div>
 
@@ -84,6 +84,14 @@ export default function AdminLoginPage() {
                         {error}
                     </p>
                 )}
+
+                <div className="auth-links">
+                    <span>还没有账号？<Link to="/admin/register">受邀注册</Link></span>
+                    <Link to="/admin/trial">申请试用</Link>
+                </div>
+                <p className="auth-note">
+                    受邀注册需要 HR 邀请码；公开访客可使用只读 Demo 账号查看虚构数据。
+                </p>
             </section>
         </main>
     );

@@ -1,5 +1,25 @@
 # Changelog
 
+## v2.3.0 — 2026-10-27
+
+### Added
+
+- **根路径改为登录入口**：`/` 直接跳转 `/admin/login`，不再展示公开模拟面试首页；候选人统一走邀请链接。
+- **受邀注册**：`POST /api/auth/register` + `/admin/register`，必须提供 `HR_SIGNUP_INVITE_CODE`；账号写入 `hr_users`，密码 bcrypt 哈希。
+- **试用申请**：`POST /api/auth/trial-request` + `/admin/trial`，写入 `trial_requests`，由维护者人工审核。
+- **受邀 HR 登录**：邮箱 + 密码登录，JWT `role=hr`；`require_admin` 同时接受环境管理员和受邀 HR。
+- **管理员查看试用申请**：`GET /api/admin/trial-requests`。
+- **新迁移**：`20261027_hr_accounts.sql`。
+
+### Security / Boundary
+
+- 不做开放注册；但仍共享同一工作区，没有每账号 AI 配额、邮箱验证、找回密码或多租户隔离。
+- 账号禁用后，已签发的 2 小时 JWT 在过期前仍可能有效；后续可加 token version/黑名单。
+
+### Tests
+
+- 新增 5 个 HR 账号/试用申请测试；总用例 76。
+
 ## v2.2.0 — 2026-10-26
 
 ### Added

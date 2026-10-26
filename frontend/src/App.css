@@ -1932,3 +1932,91 @@
   .hr-mobile-dock a.active { color: #644bea; font-weight: 700; }
   .app:has(> .hr-mobile-dock) .main-content { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 }
+
+/* ===== V2.3 受邀注册 / 试用申请 ===== */
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #eef2f9;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.auth-links a,
+.auth-footer a,
+.auth-note a {
+  color: #4f46e5;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-links a:hover,
+.auth-footer a:hover,
+.auth-note a:hover {
+  text-decoration: underline;
+}
+
+.auth-note {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.auth-footer {
+  margin: 16px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
+.form-group textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid #dbe3f2;
+  border-radius: 10px;
+  background: #fff;
+  color: #1e293b;
+  font: inherit;
+  resize: vertical;
+}
+
+.form-group textarea:focus {
+  outline: none;
+  border-color: #8b7cf6;
+  box-shadow: 0 0 0 3px rgba(139, 124, 246, 0.12);
+}
+
+.trial-success {
+  padding: 22px;
+  border: 1px solid #d9f0e2;
+  border-radius: 14px;
+  background: #f3fbf7;
+  color: #334155;
+}
+
+.trial-success strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #166534;
+  font-size: 16px;
+}
+
+.trial-success p {
+  margin: 6px 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.trial-back {
+  display: block;
+  margin-top: 18px;
+  text-align: center;
+  text-decoration: none;
+}

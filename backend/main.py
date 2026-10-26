@@ -51,6 +51,8 @@ from app.structured_interview import stage_after_answer, CLOSING_MESSAGE, QUESTI
 from app.admin_workflow import router as admin_workflow_router
 from app.demo_routes import router as demo_router
 from app.pipeline import router as pipeline_router
+from app.account_routes import router as account_router, admin_router as account_admin_router
+from app.hr_auth import authenticate_hr, create_hr_token
 from app.evaluation_workflow import get_evaluation_state, generate_and_store_report
 from app.model_usage import model_usage_scope, link_interview_to_trace
 from app.answer_idempotency import reserve_attempt, fail_attempt, has_active_attempt
@@ -59,13 +61,15 @@ from app.answer_idempotency import reserve_attempt, fail_attempt, has_active_att
 app = FastAPI(
     title="InterviewPilot API",
     description="AI 面试与招聘管理系统后端：岗位邀请、结构化面试、证据评估、招聘跟进与人工复核。",
-    version="2.2.0",
+    version="2.3.0",
 )
 
 app.include_router(job_router)
 app.include_router(admin_workflow_router)
 app.include_router(demo_router)
 app.include_router(pipeline_router)
+app.include_router(account_router)
+app.include_router(account_admin_router)
 
 candidate_bearer = HTTPBearer(auto_error=False)
 
@@ -133,24 +137,46 @@ def admin_login(
             detail="登录失败次数过多，请15分钟后再试",
         )
 
-    # 2. 验证真实管理员或独立 Demo 凭证（均受同一登录限流保护）。
+    # 2. 验证环境管理员、独立 Demo，或受邀注册的 HR 邮箱账号。
     # Demo 不取得 require_admin 权限，也不读取任何真实数据库内容。
+    role: str | None = None
+    token: str | None = None
+    email: str | None = None
+
     if authenticate_admin(login_data.username, login_data.password):
         role = "admin"
+        token = create_admin_token()
     elif authenticate_demo(login_data.username, login_data.password):
         role = "demo"
-    else:
+        token = create_demo_token()
+    elif "@" in login_data.username:
+        # Only email-shaped usernames trigger a DB lookup; env admin/demo tests
+        # and the legacy login path never need a MySQL connection here.
+        try:
+            with SessionLocal() as db:
+                user = authenticate_hr(db, login_data.username, login_data.password)
+        except Exception:
+            logger.exception("HR 账号登录查询失败")
+            user = None
+        if user is not None:
+            role = "hr"
+            email = user.email
+            token = create_hr_token(user)
+
+    if role is None or token is None:
         record_login_failure(client_ip)
         raise HTTPException(status_code=401, detail="账号或密码错误")
 
     clear_login_failures(client_ip)
-    token = create_admin_token() if role == "admin" else create_demo_token()
-    return {
+    payload = {
         "access_token": token,
         "token_type": "bearer",
         "expires_in": 7200,
         "role": role,
     }
+    if email:
+        payload["email"] = email
+    return payload
 
 
 # 定义创建面试时的数据格式

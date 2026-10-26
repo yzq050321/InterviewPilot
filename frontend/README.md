@@ -9,7 +9,10 @@ React 19 + TypeScript + Vite 前端，包含候选人端与 HR 招聘工作台�
 | `/` | 候选人首页，创建模拟面试 |
 | `/invite/:inviteCode` | 通过 HR 邀请链接进入指定岗位；可选上传 PDF/DOCX 简历 |
 | `/interview/:id` | 候选人面试聊天、刷新恢复与结束面试 |
-| `/admin/login` | HR / Demo 登录 |
+| `/` | 直接跳转 `/admin/login`，不再展示公开模拟面试首页 |
+| `/admin/login` | 管理员 / 受邀 HR / Demo 登录 |
+| `/admin/register` | 受邀注册 HR 账号（需要邀请码） |
+| `/admin/trial` | 申请试用，提交后人工审核 |
 | `/admin` | 全部面试列表与筛选 |
 | `/admin/jobs` | 岗位工作台：统计、搜索、筛选、创建任务 |
 | `/admin/jobs/:jobId` | 岗位详情、邀请链接、候选人列表 |
@@ -32,6 +35,14 @@ npm run lint    # oxlint
 ```
 
 当前 `npm run lint` 有 5 条 React Hook 规范警告，均为非阻断项；`npm run build` 通过。
+
+## 账号入口
+
+- 根路径直接跳登录页；候选人只通过 `/invite/:inviteCode` 进入面试。
+- 登录页提供“受邀注册”和“申请试用”入口。
+- 注册需要 `HR_SIGNUP_INVITE_CODE`；成功后直接把 HR JWT 存进 `sessionStorage` 并进入岗位工作台。
+- 试用申请只写 `trial_requests`，不会自动创建账号。
+- Demo 仍然只读，不能创建岗位或触发 AI。
 
 ## 简历上传
 

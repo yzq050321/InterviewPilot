@@ -249,7 +249,7 @@ export async function loginAdmin(
   access_token: string;
   token_type: string;
   expires_in: number;
-  role: "admin" | "demo";
+  role: "admin" | "demo" | "hr";
 }> {
   const response = await fetch(
     `${API_BASE}/api/admin/login`,

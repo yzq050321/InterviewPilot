@@ -97,10 +97,13 @@ def verify_admin_token(token: str) -> bool:
             options={"require": ["sub", "role", "iat", "exp"]},
         )
 
-        return (
-            payload.get("sub") == "admin"
-            and payload.get("role") == "admin"
-        )
+        if payload.get("role") == "admin":
+            return payload.get("sub") == "admin"
+        # V2.3: invited HR accounts use role="hr" and a numeric subject.
+        # Status/revocation is checked at login; tokens expire after 2 hours.
+        if payload.get("role") == "hr":
+            return bool(payload.get("sub")) and bool(payload.get("email"))
+        return False
 
     except jwt.InvalidTokenError:
         return False
@@ -114,7 +117,7 @@ admin_bearer = HTTPBearer(auto_error=False)
 def require_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(admin_bearer),
 ) -> None:
-    """验证当前请求是否具有 HR 管理员权限。"""
+    """验证当前请求是否具有 HR 权限（环境管理员或受邀 HR 账号）。"""
 
     if credentials is None:
         raise HTTPException(
