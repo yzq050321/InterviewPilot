@@ -7,7 +7,7 @@ React 19 + TypeScript + Vite 前端，包含候选人端与 HR 招聘工作台�
 | 路由 | 说明 |
 | --- | --- |
 | `/` | 候选人首页，创建模拟面试 |
-| `/invite/:inviteCode` | 通过 HR 邀请链接进入指定岗位 |
+| `/invite/:inviteCode` | 通过 HR 邀请链接进入指定岗位；可选上传 PDF/DOCX 简历 |
 | `/interview/:id` | 候选人面试聊天、刷新恢复与结束面试 |
 | `/admin/login` | HR / Demo 登录 |
 | `/admin` | 全部面试列表与筛选 |
@@ -32,6 +32,14 @@ npm run lint    # oxlint
 ```
 
 当前 `npm run lint` 有 5 条 React Hook 规范警告，均为非阻断项；`npm run build` 通过。
+
+## 简历上传
+
+- 邀请页支持 `PDF / DOCX`，前端先校验扩展名与 5 MB 上限。
+- 用户必须勾选同意后才能提交；表单使用 `FormData` 调用
+  `/api/job-invitations/{code}/interviews/with-resume`。
+- 原文件不保存；后端只保存解析后的文本、文件名和同意时间。
+- 扫描版 PDF 没有文字层时会返回 400，前端展示后端错误。
 
 ## 认证与恢复
 

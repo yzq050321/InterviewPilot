@@ -1029,6 +1029,42 @@
 
 /* ===== HR AI 评估报告：文字分析卡片 ===== */
 
+.admin-resume-panel {
+  margin-top: 16px;
+  padding: 18px 22px;
+  border: 1px solid #dbe5f5;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.admin-resume-panel summary {
+  cursor: pointer;
+  color: #233453;
+  font-weight: 700;
+}
+
+.admin-resume-panel p {
+  margin: 10px 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.admin-resume-panel pre {
+  max-height: 260px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 13px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* 每一块分析内容独立成卡片 */
 .admin-evaluation-section {
   position: relative;
@@ -1331,6 +1367,58 @@
 .jobs-heading { border-bottom: 1px solid #e8ecf5; padding-bottom: 20px; margin-bottom: 26px; }
 .jobs-heading h2 { color: #1e293b; margin: 0 0 8px; }
 .jobs-subtitle, .jobs-hint { color: #64748b; font-size: 13px; line-height: 1.7; }
+
+.resume-upload {
+  margin: 4px 0 16px;
+  padding: 14px 16px;
+  border: 1px dashed #c7d2fe;
+  border-radius: 12px;
+  background: #f8faff;
+}
+
+.resume-upload > label:first-child {
+  display: block;
+  margin-bottom: 8px;
+  color: #233453;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.resume-upload input[type="file"] {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #dbe2f0;
+  border-radius: 9px;
+  background: #fff;
+  color: #475569;
+  font-size: 13px;
+}
+
+.resume-selected {
+  margin: 8px 0 0;
+  color: #4f46e5;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.resume-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  color: #475569;
+  font-size: 12.5px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.resume-consent input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
 .jobs-back { color: #4f46e5; font-size: 14px; white-space: nowrap; }
 .jobs-form { background: #f8faff; border: 1px solid #e8ecf5; border-radius: 16px; padding: 22px; }
 .jobs-form h3, .jobs-list h3 { color: #25304a; margin: 0 0 20px; }

@@ -59,7 +59,7 @@ from app.answer_idempotency import reserve_attempt, fail_attempt, has_active_att
 app = FastAPI(
     title="InterviewPilot API",
     description="AI 面试与招聘管理系统后端：岗位邀请、结构化面试、证据评估、招聘跟进与人工复核。",
-    version="2.1.0",
+    version="2.2.0",
 )
 
 app.include_router(job_router)
@@ -385,6 +385,7 @@ async def interview_followup(
         # 邀请面试的提问维度由后端控制，避免模型一直只问技术题。
         job = db.get(JobPosting, interview.job_id) if interview.job_id is not None else None
         requirements = job.requirements if job is not None else None
+        resume_text = interview.resume_text
         answer_count = sum(1 for item in history if item["role"] == "user")
         next_stage = stage_after_answer(answer_count) if interview.job_id is not None else None
 
@@ -397,11 +398,22 @@ async def interview_followup(
                 # 第八次回答后不额外调用模型，提示候选人提交完成。
                 next_question = CLOSING_MESSAGE
             elif next_stage in (None, "technical_followup"):
-                args = (interview.position, interview.difficulty, history)
+                kwargs = {}
                 if requirements:
-                    args += (requirements,)
-                next_question = await run_in_threadpool(generate_followup_agent, *args)
+                    kwargs["requirements"] = requirements
+                if resume_text:
+                    kwargs["resume_text"] = resume_text
+                next_question = await run_in_threadpool(
+                    generate_followup_agent,
+                    interview.position,
+                    interview.difficulty,
+                    history,
+                    **kwargs,
+                )
             else:
+                kwargs = {}
+                if resume_text:
+                    kwargs["resume_text"] = resume_text
                 next_question = await run_in_threadpool(
                     generate_competency_question_agent,
                     interview.position,
@@ -409,6 +421,7 @@ async def interview_followup(
                     requirements,
                     next_stage,
                     history,
+                    **kwargs,
                 )
 
     except HTTPException:
@@ -507,6 +520,7 @@ def list_interviews(
             "job_id": interview.job_id,
             "evaluation_status": get_evaluation_state(interview, interview.id in report_ids),
             "review_status": interview.review_status,
+            "has_resume": bool(interview.resume_text),
             "created_at": interview.created_at
         })
 
@@ -566,6 +580,9 @@ def get_admin_interview(
         "review_status": interview.review_status,
         "review_note": interview.review_note,
         "reviewed_at": interview.reviewed_at,
+        "has_resume": bool(interview.resume_text),
+        "resume_filename": interview.resume_filename,
+        "resume_text": interview.resume_text,
         "created_at": interview.created_at,
         "messages": message_list,
     }

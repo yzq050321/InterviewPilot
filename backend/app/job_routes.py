@@ -10,7 +10,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
 from openai import APITimeoutError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -23,6 +23,7 @@ from app.candidate_auth import create_candidate_token
 from app.database import get_db
 from app.models import Interview, JobPosting, Message
 from app.interview_create_limiter import require_create_capacity
+from app.resume_service import MAX_RESUME_BYTES, ResumeParseError, extract_resume_text
 from app.services.agent_service import generate_question_agent
 from app.model_usage import model_usage_scope, link_interview_to_trace
 
@@ -176,6 +177,126 @@ def get_job_invitation(
         "position": job.position,
         "requirements": job.requirements,
         "difficulty": job.difficulty,
+    }
+
+
+@router.post(
+    "/api/job-invitations/{invite_code}/interviews/with-resume",
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_invited_interview_with_resume(
+    invite_code: str,
+    candidate_name: str = Form(...),
+    consent: bool = Form(...),
+    resume: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Create an invited interview grounded in an uploaded resume.
+
+    The original file is read into memory, parsed, and discarded. Only extracted
+    text + filename + consent timestamp are stored.
+    """
+    name = candidate_name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="候选人姓名不能为空")
+    if len(name) > 100:
+        raise HTTPException(status_code=422, detail="候选人姓名不能超过 100 个字符")
+    if not consent:
+        raise HTTPException(status_code=422, detail="请先阅读并同意简历使用说明")
+
+    job = db.scalar(
+        select(JobPosting).where(
+            JobPosting.invite_code == invite_code,
+            JobPosting.is_active.is_(True),
+        )
+    )
+    job = _require_invitation_open(job)
+
+    job_id, position, difficulty = job.id, job.position, job.difficulty
+    requirements = job.requirements
+
+    # 解析和 AI 调用前先限流，避免共享邀请码被刷。
+    require_create_capacity(invite_code=invite_code)
+
+    filename = resume.filename
+    try:
+        raw = await resume.read(MAX_RESUME_BYTES + 1)
+    finally:
+        await resume.close()
+    if len(raw) > MAX_RESUME_BYTES:
+        raise HTTPException(status_code=413, detail="简历文件不能超过 5 MB")
+
+    try:
+        parsed = await run_in_threadpool(extract_resume_text, filename, raw)
+    except ResumeParseError as exc:
+        code = 413 if "5 MB" in str(exc) else 400
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+
+    try:
+        with model_usage_scope(stage="first_question", job_id=job_id) as usage_trace:
+            question = await run_in_threadpool(
+                generate_question_agent,
+                position,
+                difficulty,
+                requirements,
+                parsed.text,
+            )
+    except APITimeoutError:
+        logger.exception("简历面试首次提问超时")
+        raise HTTPException(status_code=504, detail="AI 服务响应超时，请稍后重试")
+    except Exception:
+        logger.exception("简历面试首次提问失败")
+        raise HTTPException(status_code=502, detail="AI 面试题生成失败")
+
+    # Recheck before recording: HR may have disabled/expired the job during parsing/AI.
+    job = db.scalar(
+        select(JobPosting)
+        .where(JobPosting.id == job_id, JobPosting.is_active.is_(True))
+        .execution_options(populate_existing=True)
+    )
+    if job is None:
+        raise HTTPException(status_code=409, detail="该招聘任务已停用")
+    if _invitation_expired(job):
+        raise HTTPException(status_code=410, detail="面试邀请已过期，请联系招聘方获取新邀请")
+
+    candidate_token, token_hash = create_candidate_token()
+    interview = Interview(
+        job_id=job_id,
+        candidate_name=name,
+        candidate_token_hash=token_hash,
+        position=position,
+        difficulty=difficulty,
+        status="in_progress",
+        resume_text=parsed.text,
+        resume_filename=parsed.filename,
+        resume_consent_at=_utc_now(),
+    )
+    try:
+        db.add(interview)
+        db.flush()
+        first_message = Message(interview_id=interview.id, role="assistant", content=question)
+        db.add(first_message)
+        db.flush()
+        db.commit()
+        link_interview_to_trace(usage_trace, interview.id)
+        db.refresh(interview)
+    except Exception:
+        db.rollback()
+        logger.exception("保存简历面试失败")
+        raise HTTPException(status_code=500, detail="保存面试记录失败")
+
+    return {
+        "interview_id": interview.id,
+        "interview_token": candidate_token,
+        "candidate_name": interview.candidate_name,
+        "position": interview.position,
+        "difficulty": interview.difficulty,
+        "question": question,
+        "question_id": first_message.id,
+        "has_resume": True,
+        "resume_filename": parsed.filename,
+        "resume_chars": len(parsed.text),
+        "resume_pages": parsed.pages,
     }
 
 

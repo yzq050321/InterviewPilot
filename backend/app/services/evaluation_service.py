@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.services.model_client import llm
-from app.services.agent_service import _format_job_requirements
+from app.services.agent_service import _format_job_requirements, _format_resume
 from app.structured_interview import verify_competency_evidence
 
 
@@ -42,6 +42,7 @@ def generate_evaluation(
     history: list[dict],
     requirements: str | None = None,
     structured: bool = False,
+    resume_text: str | None = None,
 ) -> EvaluationReport:
 
     # 1. 检查是否有用户回答
@@ -91,6 +92,8 @@ def generate_evaluation(
 - 评价要具体、建设性。
 - 岗位要求仅作为技术评价参考，不代表候选人已经掌握这些技能。
 - 不能因为岗位要求的文字描述而编造候选人的经历或能力。
+- 简历仅用于理解候选人背景；评分证据必须来自面试回答，不能把简历内容当作回答证据。
+- 简历是候选人自述，不能因为简历写了某项技能就直接给高分。
 - 只返回一个合法JSON对象。
 - 不要输出Markdown代码块。
 - 不要输出JSON以外的解释。
@@ -134,6 +137,7 @@ technical、communication、learning、execution 四个键。
                 f"面试岗位：{position}\n"
                 f"面试难度：{difficulty}\n"
                 f"{_format_job_requirements(requirements)}\n"
+                f"{_format_resume(resume_text)}\n"
                 f"完整面试记录：\n{history_text}"
             )
         )

@@ -1,13 +1,13 @@
 # InterviewPilot 架构说明
 
-本文记录 InterviewPilot V2.1 的请求链路、关键设计、失败处理和代码入口，目标是让阅读者在 15 分钟内理解“为什么这样写”，而不是只看到功能列表。
+本文记录 InterviewPilot V2.2 的请求链路、关键设计、失败处理和代码入口，目标是让阅读者在 15 分钟内理解“为什么这样写”，而不是只看到功能列表。
 
 ## 1. 系统边界
 
 InterviewPilot 解决的是**招聘初筛**，不是完整 HR 系统：
 
-- 输入：HR 创建的岗位（名称、JD、难度、邀请有效期）+ 候选人姓名。
-- 处理：8 轮四维文字面试 + 结构化评估 + HR 招聘跟进。
+- 输入：HR 创建的岗位（名称、JD、难度、邀请有效期）+ 候选人姓名 + 可选简历。
+- 处理：简历解析（只存文本）→ 8 轮四维文字面试 + 结构化评估 + HR 招聘跟进。
 - 输出：带原文证据的辅助报告、招聘阶段/跟进历史、人工复核状态。
 - 不做：自动录用/淘汰、背景调查、薪酬谈判、企业多租户。
 
@@ -21,7 +21,8 @@ React SPA
         ▼
 FastAPI
   ├── main.py                 候选人面试、登录、报告入口
-  ├── app/job_routes.py       岗位 CRUD、邀请码、有效期、邀请面试
+  ├── app/job_routes.py       岗位 CRUD、邀请码、有效期、邀请面试、简历面试
+  ├── app/resume_service.py   PDF/DOCX 文本提取、大小/页数/类型限制
   ├── app/pipeline.py         招聘阶段、append-only 跟进历史
   ├── app/admin_workflow.py   HR 报告重试、人工复核
   ├── app/evaluation_workflow.py  报告状态机、租约、幂等
@@ -80,6 +81,33 @@ sequenceDiagram
 - 过期链接返回 `410`，停用链接返回 `404`；两者在 AI 调用前拒绝。
 - 迁移后旧岗位获得 7 天宽限期；`NULL` 失败关闭（视为不可用）。
 - `candidate_token` 只返回一次；数据库保存 SHA-256 哈希，不保存明文。
+
+### 3.1.1 简历上传与简历驱动首题（V2.2）
+
+```mermaid
+sequenceDiagram
+    participant C as 候选人
+    participant API as FastAPI
+    participant R as resume_service
+    participant DB as MySQL
+    participant LLM as DeepSeek
+    C->>API: POST /interviews/with-resume (multipart)
+    API->>API: 校验邀请 + 限流 + consent
+    API->>R: extract_resume_text(filename, bytes)
+    R-->>API: 文本 / 页数（原文件丢弃）
+    API->>LLM: 岗位 JD + 简历文本 + 不可信数据声明
+    LLM-->>API: 第一道简历相关题
+    API->>DB: INSERT interview(resume_text, filename, consent_at)
+    API-->>C: interview_token + question + question_id
+```
+
+关键点：
+
+- 上传在**创建面试之前**完成，首题就能结合简历；不需要“先创建再删题”。
+- 原文件只在内存中存在；数据库只保存 `resume_text`、`resume_filename`、`resume_consent_at`。
+- 简历文本截断到 8000 字，PDF 限 20 页、文件限 5 MB；DOCX 额外限制解压后 20 MB。
+- 扫描版 PDF 没有文字层时返回 400，不做 OCR。
+- 后续追问通过 `resume_text` 传入 Prompt；评估只把简历当背景，证据必须来自面试回答。
 
 ### 3.2 答题幂等与恢复
 
@@ -257,6 +285,7 @@ job_postings 1 ── n interviews 1 ── n messages
                                   └── question_id → messages.id
 ```
 
+- `interviews.resume_text / resume_filename / resume_consent_at`：V2.2 简历文本、展示文件名与同意时间；不保存原文件。
 - `interviews.job_id` 可空：兼容 V1 没有岗位来源的旧面试。
 - `evaluations.interview_id` 唯一：一场面试最多一份报告。
 - `interview_answer_attempts` 对 `(interview_id, question_id)` 唯一：一道题最多一次成功提交。
@@ -267,19 +296,20 @@ job_postings 1 ── n interviews 1 ── n messages
 
 如果要在面试前快速讲清楚项目，建议按这个顺序读：
 
-1. `backend/app/models.py`：六张表/关系与唯一约束。
-2. `backend/app/job_routes.py`：岗位、邀请码、有效期、创建面试。
-3. `backend/app/answer_idempotency.py`：答题占位、重放、租约。
-4. `backend/main.py` 的 `interview_followup`：鉴权 → 幂等 → 状态机 → 模型 → 事务。
-5. `backend/app/structured_interview.py`：阶段与证据校验。
-6. `backend/app/services/agent_service.py`：Prompt、历史、工具调用。
-7. `backend/app/services/rag_service.py`：知识库检索。
-8. `backend/app/evaluation_workflow.py`：报告并发与失败恢复。
-9. `backend/app/services/evaluation_service.py`：结构化评估。
-10. `backend/app/pipeline.py`：招聘阶段与跟进历史。
-11. `backend/app/model_usage.py`：用量 telemetry。
-12. `frontend/src/App.tsx` 与 `src/pages/`：端到端 UI。
-13. `backend/tests/`：每个设计决策对应的回归测试。
+1. `backend/app/models.py`：六张表/关系与唯一约束、简历字段。
+2. `backend/app/job_routes.py`：岗位、邀请码、有效期、创建面试、简历面试。
+3. `backend/app/resume_service.py`：PDF/DOCX 解析与边界限制。
+4. `backend/app/answer_idempotency.py`：答题占位、重放、租约。
+5. `backend/main.py` 的 `interview_followup`：鉴权 → 幂等 → 状态机 → 模型 → 事务。
+6. `backend/app/structured_interview.py`：阶段与证据校验。
+7. `backend/app/services/agent_service.py`：Prompt、简历注入、历史、工具调用。
+8. `backend/app/services/rag_service.py`：知识库检索。
+9. `backend/app/evaluation_workflow.py`：报告并发与失败恢复。
+10. `backend/app/services/evaluation_service.py`：结构化评估与简历边界。
+11. `backend/app/pipeline.py`：招聘阶段与跟进历史。
+12. `backend/app/model_usage.py`：用量 telemetry。
+13. `frontend/src/App.tsx` 与 `src/pages/`：端到端 UI。
+14. `backend/tests/`：每个设计决策对应的回归测试。
 
 ## 8. 已知不足
 
@@ -288,6 +318,7 @@ job_postings 1 ── n interviews 1 ── n messages
 - 限流是单进程内存，无法跨 worker 共享；Nginx 反代下登录限流 IP 可能是代理地址。
 - 没有 token/成本看板、审计日志、数据保留策略；用量日志没有自动轮转。
 - 没有 CI、E2E 测试和容器化部署。
+- 简历文本没有 TTL/删除接口/字段加密，PII 保留策略尚未实现；扫描版 PDF/OCR 未支持。
 - 招聘阶段没有“续期邀请”或批量操作；邀请码仍是共享凭证。
 
 这些不足不影响“跑通业务闭环”，但决定了它现在适合作为作品集/原型，而不是直接商用。

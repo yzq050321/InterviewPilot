@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.2.0 — 2026-10-26
+
+### Added
+
+- **简历上传与解析**：候选人邀请页支持 PDF / DOCX（5 MB、20 页），后端只保存解析文本、文件名和同意时间，不保存原文件。
+- **简历驱动面试**：首题优先从简历中与岗位相关的项目切入；技术追问与软技能题可携带简历背景。
+- **简历感知评估**：简历仅作为背景参考，Prompt 明确要求评分证据必须来自面试回答。
+- **新接口**：`POST /api/job-invitations/{invite_code}/interviews/with-resume`（multipart）。
+- **新迁移**：`20261026_resume_interview.sql`，为 `interviews` 增加 `resume_text / resume_filename / resume_consent_at`。
+- **测试**：新增 6 个简历解析测试 + 6 个简历面试 API 测试；总计 71 个用例。
+
+### Security / Privacy
+
+- 简历文本按不可信数据注入，JSON 编码，明确不是系统指令。
+- 限制文件大小、页数、DOCX 解压后大小；扫描版 PDF 明确拒绝，不做 OCR。
+- 前端要求勾选同意后才能提交；原文件不上传、不落盘。
+
 ## v2.1.0 — 2026-10-24
 
 ### Added

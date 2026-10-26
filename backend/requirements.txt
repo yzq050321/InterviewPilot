@@ -12,6 +12,11 @@ PyJWT>=2.8,<3.0
 bcrypt>=4.1,<6.0
 python-dotenv>=1.0,<2.0
 
+# Resume upload / parsing
+python-multipart>=0.0.9,<1.0
+pypdf>=5.0,<7.0
+python-docx>=1.1,<2.0
+
 # LLM / Agent / RAG
 openai>=1.40,<4.0
 langchain-core>=0.3,<2.0

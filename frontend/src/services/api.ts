@@ -340,6 +340,9 @@ export async function getAdminInterviewDetail(
   review_status: import("./adminWorkflowApi").ReviewStatus;
   review_note: string | null;
   reviewed_at: string | null;
+  has_resume?: boolean;
+  resume_filename?: string | null;
+  resume_text?: string | null;
   created_at: string;
   messages: { id: number; role: string; content: string; created_at: string }[];
 }> {

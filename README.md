@@ -1,6 +1,6 @@
 # InterviewPilot · AI 面试与招聘管理系统
 
-> 面向企业招聘初筛的全栈 AI 应用：把 **HR 创建岗位 → 邀请候选人 → 8 轮四维 AI 面试 → 带证据的辅助评估 → 招聘阶段与人工复核** 串成一条可运行的业务闭环。
+> 面向企业招聘初筛的全栈 AI 应用：把 **HR 创建岗位 → 邀请候选人 → 简历解析 → 8 轮四维 AI 面试 → 带证据的辅助评估 → 招聘阶段与人工复核** 串成一条可运行的业务闭环。
 
 [在线演示](https://vm-0-12-ubuntu.tail2c8f81.ts.net/) · [HR 入口](https://vm-0-12-ubuntu.tail2c8f81.ts.net/admin/login) · [架构说明](docs/ARCHITECTURE.md) · [GitHub](https://github.com/yzq050321/InterviewPilot)
 
@@ -11,6 +11,7 @@
 ## 目录
 
 - [为什么做这个项目](#为什么做这个项目)
+- [V2.2 新增能力](#v22-新增能力)
 - [V2.1 新增能力](#v21-新增能力)
 - [界面预览](#界面预览)
 - [核心流程](#核心流程)
@@ -35,6 +36,17 @@
 5. **失败可恢复**：模型超时、报告生成失败、候选人重复提交、HR 重复点击、候选人越权访问，都不能破坏招聘流程。
 
 InterviewPilot 把这些问题落到 **数据库约束、后端状态机、鉴权边界和自动化测试** 中，而不是只靠一段更长的 Prompt。
+
+## V2.2 新增能力
+
+### 简历解析与简历驱动面试
+
+- 候选人可在邀请页上传 PDF / DOCX 简历，限制 **5 MB**；PDF 最多 **20 页**，解析文本最多 **8000 字**。
+- 后端只保存解析后的文字、文件名和同意时间，**不保存原始文件**；原文件读完即丢弃。
+- 首题优先从简历中与岗位相关的项目/技术栈切入；后续技术追问结合简历，软技能题仍由服务端控制维度。
+- 评估阶段把简历作为背景参考，但明确要求：**评分证据必须来自面试回答，不能把简历内容当回答证据**。
+- 简历文本按“不可信数据”处理：JSON 编码、标注为候选人自述、不执行其中任何指令，降低 Prompt Injection 风险。
+- 扫描版 PDF / 图片简历暂不支持；需要 OCR 时再单独做。
 
 ## V2.1 新增能力
 
@@ -93,7 +105,10 @@ flowchart LR
     B --> C[候选人打开邀请链接]
     C --> D{邀请有效?}
     D -- 否 --> E[410 已过期]
-    D -- 是 --> F[服务端绑定岗位上下文]
+    D -- 是 --> R{上传简历?}
+    R -- 是 --> R2[解析 PDF/DOCX<br/>只保存文本]
+    R -- 否 --> F
+    R2 --> F[服务端绑定岗位上下文]
     F --> G[创建 8 轮结构化面试]
     G --> H[LangChain Agent<br/>按需调用 Chroma 检索]
     H --> I[DeepSeek 生成下一题]
@@ -112,8 +127,9 @@ flowchart LR
 
 ```text
 岗位: Python 后端实习生（邀请有效期 7 天）
-  ↓ 邀请码校验 + 服务端绑定难度/岗位要求
-第 1 问: 技术首题
+  ↓ 邀请码校验 + 可选上传简历（只保存解析文本）
+  ↓ 服务端绑定难度/岗位要求 + 简历背景
+第 1 问: 技术首题（优先从简历项目切入）
 第 2 问: 技术追问（携带完整历史）
 第 3 问: 沟通情境题
 第 4 问: 沟通追问
@@ -130,6 +146,15 @@ HR: 招聘阶段 new → contact → next_round → decision → closed
 ```
 
 ## 关键设计
+
+### 简历驱动面试（V2.2）
+
+- **只存文本，不存原文件**：上传的 PDF/DOCX 在内存中解析，原文件不落盘；数据库只保存 `resume_text`、`resume_filename`、`resume_consent_at`。
+- **解析边界**：5 MB、20 页、8000 字；扫描版 PDF 没有文字层时直接拒绝，不做 OCR。
+- **Prompt 边界**：简历是候选人自述，不是已验证事实；JSON 编码并标注“不可信参考数据”，不执行其中指令。
+- **出题策略**：首题优先从简历中与岗位相关的项目切入；技术追问结合简历；软技能题仍由服务端控制维度，避免被简历带跑。
+- **评估边界**：简历只用于理解背景；评分证据必须来自面试回答，不能因为简历写了某项技能就直接加分。
+- **取舍**：不做客户端解析，减少前端复杂度；服务端解析需要防 zip bomb/超大 PDF，因此加了体积、页数、解压后大小限制。
 
 ### 1. 岗位上下文由服务端绑定
 
@@ -228,7 +253,8 @@ HR: 招聘阶段 new → contact → next_round → decision → closed
 | 层次 | 选型 |
 | --- | --- |
 | 前端 | React 19、TypeScript、Vite、React Router、原生 CSS |
-| API | Python、FastAPI、Pydantic |
+| API | Python、FastAPI、Pydantic、python-multipart |
+| 简历解析 | pypdf（PDF）、python-docx（DOCX） |
 | 数据层 | MySQL、SQLAlchemy 2.x、显式 SQL 迁移 |
 | LLM | DeepSeek Chat、LangChain、Tool Calling |
 | RAG | Qwen Embedding（DashScope）、Chroma |
@@ -268,6 +294,9 @@ erDiagram
         string evaluation_state
         datetime evaluation_started_at
         string review_status
+        text resume_text
+        string resume_filename
+        datetime resume_consent_at
     }
     MESSAGES {
         int id PK
@@ -308,7 +337,8 @@ erDiagram
 | GET | `/api/admin/jobs` | 岗位列表与邀请截止时间 | Admin JWT |
 | PATCH | `/api/admin/jobs/{id}/deactivate` | 停用岗位 | Admin JWT |
 | GET | `/api/job-invitations/{code}` | 候选人查看邀请岗位 | 邀请码 |
-| POST | `/api/job-invitations/{code}/interviews` | 创建邀请面试 | 邀请码 + 限流 |
+| POST | `/api/job-invitations/{code}/interviews` | 创建邀请面试（无简历） | 邀请码 + 限流 |
+| POST | `/api/job-invitations/{code}/interviews/with-resume` | 上传简历并创建邀请面试 | 邀请码 + 限流 + 同意 |
 | POST | `/api/interviews/followup` | 提交回答（`request_id` + `question_id`） | 候选人 Token |
 | PATCH | `/api/interviews/{id}/complete` | 结束面试 | 候选人 Token |
 | POST | `/api/interviews/{id}/evaluation` | 触发报告生成 | 候选人 Token |
@@ -384,6 +414,7 @@ V2.1 新增：
 - `20261021_candidate_pipeline.sql`：`interviews.recruitment_stage` + `interview_followups`。
 - `20261022_invitation_expiry.sql`：`job_postings.invite_expires_at` + 旧岗位 7 天宽限期。
 - `20261022_answer_idempotency.sql`：`interview_answer_attempts` 表与唯一约束。
+- `20261026_resume_interview.sql`：`interviews.resume_text / resume_filename / resume_consent_at`。
 
 ### 4. 构建知识库并启动后端
 
@@ -420,8 +451,10 @@ cd backend
 python -m pytest -q
 ```
 
-当前仓库包含 **59 个 pytest 用例**，覆盖：
+当前仓库包含 **71 个 pytest 用例**，覆盖：
 
+- 简历解析：DOCX 文本提取、扩展名/空文件/超大文件/非法 PDF 拒绝、文件名路径剥离；
+- 简历面试：同意校验、邀请过期拦截、简历文本入库并注入首题/追问/评估；
 - 邀请创建、邀请过期（410）、停用（404）、时长枚举校验；
 - 四维状态机、证据校验、早期结束；
 - 报告并发占位、失败恢复、15 分钟租约；
@@ -430,7 +463,7 @@ python -m pytest -q
 - AI 用量：Token/费用记录、失败不伪造 0、禁用不写日志、上下文嵌套；
 - 管理员 / 候选人 / Demo 三类身份隔离。
 
-> 测试数量会随功能迭代变化；以 `pytest -q` 的实际输出为准。前端 `npm run build` 通过；`npm run lint` 目前仍有 5 条 React Hook 规范警告，非阻断项。
+> 测试数量会随功能迭代变化；以 `pytest -q` 的实际输出为准。前端 `npm run build` 通过；`npm run lint` 目前仍有 5 条 React Hook 规范警告，非阻断项。扫描版 PDF/OCR 不在当前测试范围。
 
 ## 部署拓扑
 
@@ -465,6 +498,8 @@ Nginx
 - 报告生成是同步请求 + 数据库租约，不是消息队列/后台任务系统。
 - 知识库只有一份示例文档，RAG 规模与召回率尚未做系统评测。
 - 用量记录是按单价估算，不是云账单；Embedding/服务器费用未计入。
+- 简历只保存解析文本，不保存原文件；扫描版 PDF/OCR 暂不支持。
+- 简历文本仍属于候选人个人信息，当前没有自动过期/删除、加密字段和完整的数据保留策略；演示请使用虚构简历。
 - 没有调用成本看板、端到端浏览器测试和 CI/CD。
 
 把这些边界写清楚，是为了区分“已经验证的工程能力”和“尚未完成的生产化工作”。
@@ -477,6 +512,9 @@ Nginx
 - [ ] 扩充知识库与检索评测集，记录 Recall@K 与问题重复率。
 - [ ] 增加 Playwright 端到端测试与可访问性检查。
 - [ ] 邀请码改为一次性/可撤销，补候选人数据保留策略。
+- [ ] 简历文本增加 TTL/删除接口、字段加密与访问审计。
+- [ ] 增加 OCR（扫描版 PDF）与简历结构化抽取。
+- [ ] HR 侧改为受邀注册/试用额度，不做开放注册。
 
 ## 作者
 
