@@ -312,17 +312,17 @@ function App() {
 
 
         <nav className="nav-links">
-          <Link to="/">首页</Link>
-
-          {interviewId !== null && (
+          {!location.pathname.startsWith("/admin") && interviewId !== null && (
             <Link to={`/interview/${interviewId}`}>
               当前面试
             </Link>
           )}
 
-          <Link to="/admin/login">
-            招聘方入口
-          </Link>
+          {!location.pathname.startsWith("/admin") && (
+            <Link to="/admin/login">
+              招聘方入口
+            </Link>
+          )}
         </nav>
       </header>
 
