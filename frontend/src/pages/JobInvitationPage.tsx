@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
@@ -13,12 +13,18 @@ type Props = { onStarted: (interview: InvitedInterview) => void };
 const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 const ALLOWED_RESUME = /\.(pdf|docx)$/i;
 
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
 export default function JobInvitationPage({ onStarted }: Props) {
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const [job, setJob] = useState<JobInvitation | null>(null);
   const [name, setName] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [consent, setConsent] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
@@ -66,6 +72,12 @@ export default function JobInvitationPage({ onStarted }: Props) {
     setError("");
     setResumeFile(file);
     setConsent(false);
+  }
+
+  function clearResume() {
+    setResumeFile(null);
+    setConsent(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function handleStart(event: FormEvent<HTMLFormElement>) {
@@ -116,25 +128,56 @@ export default function JobInvitationPage({ onStarted }: Props) {
                 onChange={(event) => setName(event.target.value)} />
             </div>
 
-            <div className="resume-upload">
-              <label htmlFor="candidate-resume">上传简历（可选）</label>
+            <div className={`resume-upload${resumeFile ? " has-file" : ""}`}>
+              <div className="resume-upload-head">
+                <span className="resume-upload-icon" aria-hidden="true">↑</span>
+                <div>
+                  <strong>上传简历（可选）</strong>
+                  <p>AI 会结合简历中的项目经历提问</p>
+                </div>
+                <span className="resume-optional">推荐</span>
+              </div>
+
               <input
+                ref={fileInputRef}
                 id="candidate-resume"
+                className="resume-file-input"
                 type="file"
                 accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 disabled={starting}
+                onClick={(event) => { event.currentTarget.value = ""; }}
                 onChange={handleResumeChange}
               />
-              <p className="jobs-hint">
-                支持 PDF / DOCX，最大 5 MB；PDF 最多 20 页，解析文本最多 8000 字。
-                AI 会结合简历中的项目提问；原文件不会保存，只保存解析后的文字用于本次面试。
-              </p>
-              {resumeFile && (
-                <p className="resume-selected">
-                  已选择：<strong>{resumeFile.name}</strong>
-                  （{(resumeFile.size / 1024).toFixed(0)} KB）
-                </p>
+
+              {!resumeFile ? (
+                <label htmlFor="candidate-resume" className="resume-dropzone">
+                  <span className="resume-dropzone-icon" aria-hidden="true">＋</span>
+                  <span className="resume-dropzone-copy">
+                    <strong>点击选择简历</strong>
+                    <small>支持 PDF / DOCX · 最大 5 MB</small>
+                  </span>
+                </label>
+              ) : (
+                <div className="resume-file-card">
+                  <span className="resume-file-icon" aria-hidden="true">
+                    {resumeFile.name.toLowerCase().endsWith(".pdf") ? "PDF" : "DOC"}
+                  </span>
+                  <div className="resume-file-meta">
+                    <strong>{resumeFile.name}</strong>
+                    <span>{formatFileSize(resumeFile.size)} · 已选择</span>
+                  </div>
+                  <div className="resume-file-actions">
+                    <label htmlFor="candidate-resume" className="resume-file-link">重新选择</label>
+                    <button type="button" onClick={clearResume} disabled={starting}>移除</button>
+                  </div>
+                </div>
               )}
+
+              <p className="resume-upload-note">
+                最大 5 MB；PDF 最多 20 页，解析文本最多 8000 字。
+                原文件不会保存，只保存解析后的文字用于本次面试。
+              </p>
+
               {resumeFile && (
                 <label className="resume-consent">
                   <input
