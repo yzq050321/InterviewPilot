@@ -4,13 +4,14 @@
 
 [在线演示](https://vm-0-12-ubuntu.tail2c8f81.ts.net/) · [HR 入口](https://vm-0-12-ubuntu.tail2c8f81.ts.net/admin/login) · [架构说明](docs/ARCHITECTURE.md) · [GitHub](https://github.com/yzq050321/InterviewPilot)
 
-![InterviewPilot 首页](docs/candidate-home.png)
+![InterviewPilot HR 招聘工作台](docs/hr-dashboard.png)
 
 > 项目为个人独立开发的可运行原型，用于技术展示与业务流程验证。AI 评估仅作为 HR 的辅助材料，不用于自动录用、自动淘汰或其他高影响招聘决策。
 
 ## 目录
 
 - [为什么做这个项目](#为什么做这个项目)
+- [V2.3 新增能力](#v23-新增能力)
 - [V2.2 新增能力](#v22-新增能力)
 - [V2.1 新增能力](#v21-新增能力)
 - [界面预览](#界面预览)
@@ -36,6 +37,22 @@
 5. **失败可恢复**：模型超时、报告生成失败、候选人重复提交、HR 重复点击、候选人越权访问，都不能破坏招聘流程。
 
 InterviewPilot 把这些问题落到 **数据库约束、后端状态机、鉴权边界和自动化测试** 中，而不是只靠一段更长的 Prompt。
+
+## V2.3 新增能力
+
+### 登录入口与受邀注册
+
+- 根路径 `/` 直接跳转 `/admin/login`；不再展示公开的“模拟面试”首页，候选人统一走 HR 邀请链接。
+- 新增 **受邀注册**：`/admin/register`，需要 `HR_SIGNUP_INVITE_CODE`；注册后账号写入 `hr_users`，密码 bcrypt 哈希。
+- 新增 **试用申请**：`/admin/trial`，提交后写入 `trial_requests`，由维护者人工审核；不会自动开通账号。
+- 原有只读 Demo 保留：只能查看虚构岗位/面试/报告，不能创建岗位或触发 AI。
+- 环境管理员账号（`ADMIN_USERNAME`）仍保留，作为主账号/应急入口。
+
+**安全边界**：
+
+- 不做开放注册；注册必须持有邀请码。
+- 没有邮箱验证、找回密码、每账号 AI 配额、多租户数据隔离；多个受邀 HR 账号目前共享同一工作区。这些是 V2.4 的生产化工作，不应对外承诺“完整 SaaS”。
+- HR JWT 有效期 2 小时；账号禁用后，已签发 Token 最多残留到过期。
 
 ## V2.2 新增能力
 
@@ -326,13 +343,34 @@ erDiagram
         string status
         datetime started_at
     }
+    HR_USERS {
+        int id PK
+        string email UK
+        string password_hash
+        string role
+        string status
+        datetime created_at
+        datetime last_login_at
+    }
+    TRIAL_REQUESTS {
+        int id PK
+        string name
+        string email
+        string company
+        text note
+        string status
+        datetime created_at
+    }
 ```
 
 ## 主要接口
 
 | 方法 | 路径 | 说明 | 鉴权 |
 | --- | --- | --- | --- |
-| POST | `/api/admin/login` | HR / Demo 登录 | 无 |
+| POST | `/api/admin/login` | 管理员 / 受邀 HR / Demo 登录 | 无 |
+| POST | `/api/auth/register` | 受邀注册 HR 账号（需邀请码） | 邀请码 |
+| POST | `/api/auth/trial-request` | 提交试用申请 | 无 |
+| GET | `/api/admin/trial-requests` | 查看试用申请 | Admin JWT |
 | POST | `/api/admin/jobs` | 创建岗位、邀请码、有效期 | Admin JWT |
 | GET | `/api/admin/jobs` | 岗位列表与邀请截止时间 | Admin JWT |
 | PATCH | `/api/admin/jobs/{id}/deactivate` | 停用岗位 | Admin JWT |
@@ -391,6 +429,9 @@ ADMIN_JWT_SECRET=replace_with_at_least_32_random_characters
 DEMO_USERNAME=demo
 DEMO_PASSWORD_HASH=replace_with_another_bcrypt_hash
 
+# 受邀注册（V2.3）：注册页必须输入此码
+HR_SIGNUP_INVITE_CODE=replace_with_random_invite_code
+
 # 可选：AI 用量记录
 MODEL_USAGE_ENABLED=1
 MODEL_INPUT_CNY_PER_M=2
@@ -409,12 +450,13 @@ python -c "from app.admin_auth import hash_password; print(hash_password('your-p
 
 按 `backend/migrations/` 中的文件顺序执行增量迁移。项目没有引入 Alembic，迁移是显式 SQL；执行前请备份数据库。
 
-V2.1 新增：
+V2.1–V2.3 新增：
 
 - `20261021_candidate_pipeline.sql`：`interviews.recruitment_stage` + `interview_followups`。
 - `20261022_invitation_expiry.sql`：`job_postings.invite_expires_at` + 旧岗位 7 天宽限期。
 - `20261022_answer_idempotency.sql`：`interview_answer_attempts` 表与唯一约束。
 - `20261026_resume_interview.sql`：`interviews.resume_text / resume_filename / resume_consent_at`。
+- `20261027_hr_accounts.sql`：`hr_users`、`trial_requests`。
 
 ### 4. 构建知识库并启动后端
 
@@ -451,8 +493,10 @@ cd backend
 python -m pytest -q
 ```
 
-当前仓库包含 **71 个 pytest 用例**，覆盖：
+当前仓库包含 **76 个 pytest 用例**，覆盖：
 
+- 受邀注册：邀请码、重复邮箱、弱密码、禁用账号、HR Token 访问管理接口；
+- 试用申请：提交入库、管理员列表；
 - 简历解析：DOCX 文本提取、扩展名/空文件/超大文件/非法 PDF 拒绝、文件名路径剥离；
 - 简历面试：同意校验、邀请过期拦截、简历文本入库并注入首题/追问/评估；
 - 邀请创建、邀请过期（410）、停用（404）、时长枚举校验；
@@ -494,6 +538,7 @@ Nginx
 
 - 不做自动录用/淘汰，AI 分数只作辅助；报告必须经 HR 人工复核。
 - 没有企业多租户、SSO、审计日志、候选人数据保留/删除策略。
+- 受邀 HR 账号目前共享同一工作区，没有 `owner_user_id` 数据隔离；也没有每账号 AI 配额/邮箱验证/找回密码。不要把它当成完整 SaaS。
 - 限流是单进程内存实现，多进程/多机部署需要 Redis 或 API 网关；Nginx 反代下 `request.client.host` 可能是代理 IP，登录限流需要可信代理配置。
 - 报告生成是同步请求 + 数据库租约，不是消息队列/后台任务系统。
 - 知识库只有一份示例文档，RAG 规模与召回率尚未做系统评测。
@@ -514,7 +559,8 @@ Nginx
 - [ ] 邀请码改为一次性/可撤销，补候选人数据保留策略。
 - [ ] 简历文本增加 TTL/删除接口、字段加密与访问审计。
 - [ ] 增加 OCR（扫描版 PDF）与简历结构化抽取。
-- [ ] HR 侧改为受邀注册/试用额度，不做开放注册。
+- [ ] 为受邀 HR 增加邮箱验证、每账号 AI 配额与工作区数据隔离。
+- [ ] 试用申请增加管理员审核界面与通知，而不是仅存数据库。
 
 ## 作者
 

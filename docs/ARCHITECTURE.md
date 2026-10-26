@@ -1,6 +1,6 @@
 # InterviewPilot 架构说明
 
-本文记录 InterviewPilot V2.2 的请求链路、关键设计、失败处理和代码入口，目标是让阅读者在 15 分钟内理解“为什么这样写”，而不是只看到功能列表。
+本文记录 InterviewPilot V2.3 的请求链路、关键设计、失败处理和代码入口，目标是让阅读者在 15 分钟内理解“为什么这样写”，而不是只看到功能列表。
 
 ## 1. 系统边界
 
@@ -27,6 +27,8 @@ FastAPI
   ├── app/admin_workflow.py   HR 报告重试、人工复核
   ├── app/evaluation_workflow.py  报告状态机、租约、幂等
   ├── app/answer_idempotency.py   答题占位、重放、失败恢复
+  ├── app/account_routes.py   受邀注册、试用申请、试用列表
+  ├── app/hr_auth.py          受邀 HR 密码哈希/登录/JWT
   ├── app/model_usage.py      opt-in 模型用量 telemetry
   ├── app/structured_interview.py 四维阶段与证据校验
   ├── app/services/            Agent / RAG / 评估 / LLM client
@@ -285,6 +287,8 @@ job_postings 1 ── n interviews 1 ── n messages
                                   └── question_id → messages.id
 ```
 
+- `hr_users`：V2.3 受邀 HR 账号；邮箱唯一、bcrypt 密码哈希、`active/disabled`。
+- `trial_requests`：V2.3 试用申请，只有 `pending`，人工审核后线下发邀请码。
 - `interviews.resume_text / resume_filename / resume_consent_at`：V2.2 简历文本、展示文件名与同意时间；不保存原文件。
 - `interviews.job_id` 可空：兼容 V1 没有岗位来源的旧面试。
 - `evaluations.interview_id` 唯一：一场面试最多一份报告。
@@ -304,6 +308,7 @@ job_postings 1 ── n interviews 1 ── n messages
 6. `backend/app/structured_interview.py`：阶段与证据校验。
 7. `backend/app/services/agent_service.py`：Prompt、简历注入、历史、工具调用。
 8. `backend/app/services/rag_service.py`：知识库检索。
+9. `backend/app/account_routes.py` + `hr_auth.py`：受邀注册、HR 登录、试用申请。
 9. `backend/app/evaluation_workflow.py`：报告并发与失败恢复。
 10. `backend/app/services/evaluation_service.py`：结构化评估与简历边界。
 11. `backend/app/pipeline.py`：招聘阶段与跟进历史。
@@ -319,6 +324,7 @@ job_postings 1 ── n interviews 1 ── n messages
 - 没有 token/成本看板、审计日志、数据保留策略；用量日志没有自动轮转。
 - 没有 CI、E2E 测试和容器化部署。
 - 简历文本没有 TTL/删除接口/字段加密，PII 保留策略尚未实现；扫描版 PDF/OCR 未支持。
+- 受邀 HR 共享同一工作区，没有 owner 级数据隔离、每账号 AI 配额、邮箱验证/找回密码；禁用账号的 JWT 在 2 小时内仍可能有效。
 - 招聘阶段没有“续期邀请”或批量操作；邀请码仍是共享凭证。
 
 这些不足不影响“跑通业务闭环”，但决定了它现在适合作为作品集/原型，而不是直接商用。

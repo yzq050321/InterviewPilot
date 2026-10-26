@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import {
-  createInterview,
   submitInterviewAnswer,
   completeInterview,
   generateInterviewEvaluation,
@@ -12,9 +11,10 @@ import type {
   Message,
   Evaluation,
 } from "./types/interview";
-import InterviewForm from "./components/InterviewForm";
 import InterviewChat from "./components/InterviewChat";
 import AdminLoginPage from "./pages/AdminLoginPage";
+import AdminRegisterPage from "./pages/AdminRegisterPage";
+import AdminTrialPage from "./pages/AdminTrialPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminInterviewDetailPage from "./pages/AdminInterviewDetailPage";
 import AdminJobsPage from "./pages/AdminJobsPage";
@@ -23,6 +23,7 @@ import JobInvitationPage from "./pages/JobInvitationPage";
 import type { InvitedInterview, Difficulty } from "./services/jobApi";
 import {
   Link,
+  Navigate,
   NavLink,
   Route,
   Routes,
@@ -38,7 +39,6 @@ function App() {
   const interviewMatch = useMatch("/interview/:id");
   const routeInterviewId = interviewMatch?.params.id;
   const chatRef = useRef<HTMLElement | null>(null);
-  const [candidateName, setCandidateName] = useState("");
   const [position, setPosition] = useState("Python 后端开发实习生");
   const [difficulty, setDifficulty] = useState<Difficulty>("中等");
   const [interviewId, setInterviewId] = useState<number | null>(null);
@@ -69,67 +69,10 @@ function App() {
 
 
 
-  // 创建一场新的模拟面试
-
-  async function startInterview() {
-    if (!candidateName.trim()) {
-      setError("请输入候选人姓名");
-      return;
-    }
-
-    if (!position.trim()) {
-      setError("请输入面试岗位");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    setCompleted(false);
-    setEvaluation(null);
-
-    try {
-      const data = await createInterview(
-        candidateName.trim(),
-        position.trim(),
-        "中等"
-      );
-
-      // 仅在当前浏览器标签页会话中保存这场面试的访问凭证
-      sessionStorage.setItem(
-        `interview_token_${data.interview_id}`,
-        data.interview_token
-      );
-      sessionStorage.removeItem(pendingKey(data.interview_id));
-      setInterviewId(data.interview_id);
-      setDifficulty("中等");
-      navigate(`/interview/${data.interview_id}`);
-
-      setMessages([
-        {
-          id: data.question_id,
-          role: "assistant",
-          content: data.question,
-        },
-      ]);
-
-      setAnswer("");
-
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "开始面试失败"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
   // 邀请面试复用现有候选人 Token、问答及完成报告流程。
   function handleInvitationStarted(data: InvitedInterview) {
     sessionStorage.setItem(`interview_token_${data.interview_id}`, data.interview_token);
     sessionStorage.removeItem(pendingKey(data.interview_id));
-    setCandidateName(data.candidate_name);
     setPosition(data.position);
     setDifficulty(data.difficulty);
     setInterviewId(data.interview_id);
@@ -389,6 +332,8 @@ function App() {
             path="/admin/login"
             element={<AdminLoginPage />}
           />
+          <Route path="/admin/register" element={<AdminRegisterPage />} />
+          <Route path="/admin/trial" element={<AdminTrialPage />} />
 
           <Route
             path="/admin"
@@ -403,33 +348,7 @@ function App() {
             path="/admin/interviews/:id"
             element={<AdminInterviewDetailPage />}
           />
-          <Route
-            path="/"
-            element={
-              <>
-                <section className="hero">
-                  <div className="hero-badge">✦ AI POWERED INTERVIEW</div>
-                  <h1>
-                    以专业展现实力，
-                    <span>让每一次回答都被看见</span>
-                  </h1>
-                  <p>智能生成面试题 · 实时深度追问 · 多维能力评估</p>
-                </section>
-
-
-                <InterviewForm
-                  candidateName={candidateName}
-                  position={position}
-                  loading={loading}
-                  interviewId={interviewId}
-                  onCandidateNameChange={setCandidateName}
-                  onPositionChange={setPosition}
-                  onStartInterview={startInterview}
-                />
-                {error && <p className="error" role="alert">{error}</p>}
-              </>
-            }
-          />
+          <Route path="/" element={<Navigate to="/admin/login" replace />} />
 
           <Route
             path="/interview/:id"
@@ -456,7 +375,7 @@ function App() {
                   </>
                 ) : (
                   <p className="history-message">
-                    尚未加载面试，请返回首页开始面试，或从历史记录恢复面试。
+                    尚未加载面试，请使用招聘方提供的邀请链接进入面试。
                   </p>
                 )}
                 {error && <p className="error" role="alert">{error}</p>}
