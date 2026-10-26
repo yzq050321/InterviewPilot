@@ -87,6 +87,8 @@ async def generate_and_store_report(
         kwargs = {"position": interview.position, "difficulty": interview.difficulty, "history": history}
         if job and job.requirements:
             kwargs["requirements"] = job.requirements
+        if interview.resume_text:
+            kwargs["resume_text"] = interview.resume_text
         if interview.job_id is not None:
             kwargs["structured"] = True
 

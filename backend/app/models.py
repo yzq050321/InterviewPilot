@@ -82,6 +82,11 @@ class Interview(Base):
         String(24), nullable=False, default="new", server_default="new"
     )
 
+    # V2.2：候选人上传简历后只保存解析文本，不保存原文件。
+    resume_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resume_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    resume_consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     # 一场面试对应多条消息
     messages: Mapped[list["Message"]] = relationship(
         back_populates="interview",

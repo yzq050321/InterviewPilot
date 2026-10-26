@@ -54,6 +54,10 @@ export type InvitedInterview = {
   difficulty: Difficulty;
   question: string;
   question_id: number;
+  has_resume?: boolean;
+  resume_filename?: string | null;
+  resume_chars?: number;
+  resume_pages?: number | null;
 };
 
 async function readError(response: Response, fallback: string): Promise<never> {
@@ -138,5 +142,24 @@ export async function createInvitedInterview(
     }
   );
   if (!response.ok) return readError(response, "创建面试失败");
+  return response.json();
+}
+
+export async function createInvitedInterviewWithResume(
+  inviteCode: string,
+  candidateName: string,
+  resume: File,
+  consent: boolean
+): Promise<InvitedInterview> {
+  const form = new FormData();
+  form.append("candidate_name", candidateName);
+  form.append("consent", consent ? "true" : "false");
+  form.append("resume", resume);
+
+  const response = await fetch(
+    `${API_BASE}/api/job-invitations/${encodeURIComponent(inviteCode)}/interviews/with-resume`,
+    { method: "POST", body: form }
+  );
+  if (!response.ok) return readError(response, "创建简历面试失败");
   return response.json();
 }

@@ -291,6 +291,17 @@ export default function AdminInterviewDetailPage() {
                             </div>
                         </div>
 
+                        {interview.has_resume && (
+                            <details className="admin-resume-panel">
+                                <summary>候选人简历（AI 已结合解析文本提问）</summary>
+                                <p>
+                                    文件：{interview.resume_filename || "resume"}
+                                    {" · "}
+                                    仅保存解析文本，不保存原文件
+                                </p>
+                                <pre>{interview.resume_text || "简历文本为空"}</pre>
+                            </details>
+                        )}
 
                         <PipelinePanel interviewId={interview.interview_id} demoMode={demoMode} />
 

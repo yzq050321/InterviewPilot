@@ -1,4 +1,4 @@
-# InterviewPilot V2.1 开发记录
+# InterviewPilot V2.2 开发记录
 
 > 详细设计见 [`ARCHITECTURE.md`](ARCHITECTURE.md)，版本变更见根目录 [`CHANGELOG.md`](../CHANGELOG.md)。
 
@@ -35,6 +35,13 @@
 | 10A | 邀请有效期 7/14/30 天、过期 410、失败关闭 | 完成 |
 | 10B | 答题幂等、`request_id`/`question_id`、15 分钟租约、刷新恢复 | 完成 |
 | 7（成本） | AI 用量 telemetry、JSONL、离线汇总脚本 | 完成 |
+| 11 (V2.2) | 简历 PDF/DOCX 解析、只存文本、简历驱动首题/追问/评估 | 完成 |
+
+## V2.2 数据模型增量
+
+- `interviews.resume_text`：解析后的简历文本，最多 8000 字。
+- `interviews.resume_filename`：展示用文件名，不保存原文件。
+- `interviews.resume_consent_at`：候选人同意将简历文本用于本次面试的时间。
 
 ## V2.1 数据模型增量
 
@@ -43,13 +50,14 @@
 - `interview_followups`：append-only 阶段变化与备注历史。
 - `interview_answer_attempts`：`(interview_id, question_id)` 唯一，`request_id` 唯一，记录 `processing / done / failed` 与缓存的下一题。
 
-## 验证记录（2026-10-24）
+## 验证记录（2026-10-26）
 
-- `python -m pytest -q`：59 个用例；当前沙箱 56 passed，3 个用量测试受临时目录权限限制（普通本地环境应全部通过）。
+- `python -m pytest -q`：71 个用例；当前沙箱 66 passed（排除 5 个用量测试），普通本地环境应全部通过。
+- 新增简历解析/简历面试测试 12 个。
 - `npm run build`：通过（TypeScript + Vite）。
 - `python -m compileall`：通过。
 - 线上演示：<https://vm-0-12-ubuntu.tail2c8f81.ts.net/>
 
 ## 已知边界
 
-当前仍是单机、单租户的可运行原型：没有 Redis/任务队列、没有 Alembic、没有审计日志与数据保留策略，限流为进程内内存实现。生产化路线见 README 的“项目边界”和“后续计划”。
+当前仍是单机、单租户的可运行原型：没有 Redis/任务队列、没有 Alembic、没有审计日志与数据保留策略，限流为进程内内存实现。简历文本属于 PII，当前没有 TTL/删除接口/字段加密；扫描版 PDF 不支持 OCR。生产化路线见 README 的“项目边界”和“后续计划”。
