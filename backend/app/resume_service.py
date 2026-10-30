@@ -46,7 +46,14 @@ def _normalize_text(value: str) -> str:
 
 def _safe_filename(filename: str | None) -> str:
     # Strip directories and cap the stored display name.
-    return (Path(filename or "resume").name or "resume")[:255]
+    # 必须同时按 "/" 和 "\\" 切分：Linux 上的 Path(...).name 只把 "/" 当作
+    # 分隔符，而浏览器/Windows 客户端可能传来反斜杠路径。只依赖 Path 会让
+    # 反斜杠路径在 Linux 服务器上原样保留，等于没剥离目录。
+    raw = (filename or "").replace("\\", "/")
+    name = raw.rsplit("/", 1)[-1].strip()
+    if not name or name in {".", ".."}:
+        name = "resume"
+    return name[:255]
 
 
 def extract_resume_text(filename: str | None, data: bytes) -> ParsedResume:
