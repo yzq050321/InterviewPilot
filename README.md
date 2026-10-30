@@ -551,7 +551,8 @@ Nginx
 
 ## 后续计划
 
-- [ ] 用 Alembic 管理迁移，补 CI（pytest + frontend build）。
+- [x] 补 CI：push / PR 时自动跑后端 pytest 与前端构建（`.github/workflows/ci.yml`）。
+- [ ] 用 Alembic 管理迁移。
 - [ ] 增加 AI 调用耗时/token 成本看板与异常告警。
 - [ ] 将报告生成迁移到后台任务队列，支持失败自动重试。
 - [ ] 扩充知识库与检索评测集，记录 Recall@K 与问题重复率。

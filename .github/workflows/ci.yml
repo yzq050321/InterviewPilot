@@ -1,0 +1,80 @@
+name: CI
+
+# 触发条件：推到 main、或对 main 发 PR 时自动运行。
+# 也可以手动触发（Actions 页面上的 "Run workflow"，需要加 workflow_dispatch）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 最小权限：只读仓库内容，不写回任何东西。
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────
+  # 任务一：后端测试
+  # ─────────────────────────────────────────────
+  backend:
+    name: 后端测试 (pytest)
+    runs-on: ubuntu-latest
+
+    # 后续所有 run 步骤都默认在 backend/ 目录下执行
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          # 固定版本，避免 ubuntu-latest 镜像升级导致 CI 随机变红
+          python-version: "3.12"
+          # 缓存 pip 下载的 wheel，第二次跑会快很多
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 关键一步：这里没有任何 .env，测试必须靠 conftest.py 自举。
+      # 如果这一步红了，说明"别人 clone 下来跑不起来"。
+      - name: 运行测试
+        run: python -m pytest -q
+
+  # ─────────────────────────────────────────────
+  # 任务二：前端构建
+  # ─────────────────────────────────────────────
+  frontend:
+    name: 前端构建 (vite)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # npm ci 严格按 package-lock.json 安装，可复现；
+      # 不要用 npm install，它会悄悄改动锁文件。
+      - name: 安装依赖
+        run: npm ci
+
+      # tsc -b && vite build：类型检查 + 打包，两者任一失败即失败
+      - name: 构建
+        run: npm run build
