@@ -2,6 +2,8 @@
 
 > 面向企业招聘初筛的全栈 AI 应用：把 **HR 创建岗位 → 邀请候选人 → 简历解析 → 8 轮四维 AI 面试 → 带证据的辅助评估 → 招聘阶段与人工复核** 串成一条可运行的业务闭环。
 
+[![CI](https://github.com/yzq050321/InterviewPilot/actions/workflows/ci.yml/badge.svg)](https://github.com/yzq050321/InterviewPilot/actions/workflows/ci.yml)
+
 [在线演示](https://vm-0-12-ubuntu.tail2c8f81.ts.net/) · [HR 入口](https://vm-0-12-ubuntu.tail2c8f81.ts.net/admin/login) · [架构说明](docs/ARCHITECTURE.md) · [GitHub](https://github.com/yzq050321/InterviewPilot)
 
 ![InterviewPilot HR 招聘工作台](docs/hr-dashboard.png)
@@ -492,6 +494,10 @@ npm run build
 cd backend
 python -m pytest -q
 ```
+
+测试无需任何 `.env`：`backend/conftest.py` 会在导入 `app` 之前注入测试用环境变量，因此在干净环境（CI、新机器）里可直接运行。
+
+**CI**：`.github/workflows/ci.yml` 在每次 push / PR 时自动执行后端 `pytest` 与前端构建，使用 Python 3.12、Node 22。
 
 当前仓库包含 **76 个 pytest 用例**，覆盖：
 
