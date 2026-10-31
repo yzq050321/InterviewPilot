@@ -1,0 +1,37 @@
+# 构建上下文里要排除哪些东西。
+# 不加这个文件，COPY . . 会把整个 .venv（几百 MB）也打进镜像。
+
+# ── 本地虚拟环境 ──
+.venv/
+.venv-uv/
+.uv-cache/
+
+# ── Python 缓存 ──
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# ── 测试产物与测试代码（运行时不需要）──
+pytest-*
+tests/
+pytest.ini
+conftest.py
+test_*.py
+
+# ── 密钥：绝对不能进镜像 ──
+.env
+.env.*
+
+# ── 本地数据与向量库 ──
+*.db
+*.sqlite3
+chroma_db/
+
+# ── 版本控制与文档 ──
+.git/
+.gitignore
+*.md
+docs/
+
+# ── 运维脚本（容器运行时不需要）──
+tools/
