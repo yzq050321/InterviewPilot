@@ -1,0 +1,100 @@
+# InterviewPilot 本地一键启动
+#
+#   docker compose up -d --build     启动全部服务
+#   docker compose logs -f api       跟踪后端日志
+#   docker compose down              停止（数据卷保留）
+#   docker compose down -v           停止并删除数据卷（清空数据库）
+#
+# 三个服务：db（MySQL）、api（FastAPI）、web（Nginx 托管前端并反代 API）
+
+name: interviewpilot
+
+services:
+  # ─────────────────────────────────────────────
+  # MySQL
+  # ─────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: ip-db
+    restart: unless-stopped
+    # 统一 utf8mb4，否则中文和 emoji 会出问题；排序规则与本地开发保持一致
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${DB_NAME:-interview_pilot}
+      MYSQL_USER: ${DB_USER:-interview_app}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-apppass}
+    volumes:
+      # 具名数据卷：容器删了数据还在。这就是"容器可抛弃"的前提。
+      - db_data:/var/lib/mysql
+    healthcheck:
+      # api 必须等数据库真的能接受连接再启动，否则建表会失败
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      - ipnet
+
+  # ─────────────────────────────────────────────
+  # 后端 API
+  # ─────────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+    container_name: ip-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        # 不是"启动顺序"，是"等 db 健康检查通过"才启动
+        condition: service_healthy
+    # 复用本地的 .env 拿 API Key 等配置；文件不存在时忽略，不阻断启动
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      # 关键：容器里不能用 127.0.0.1，那是容器自己。
+      # "db" 是上面的服务名，Compose 会把容器名解析成内网 IP。
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_USER: ${DB_USER:-interview_app}
+      DB_PASSWORD: ${DB_PASSWORD:-apppass}
+      DB_NAME: ${DB_NAME:-interview_pilot}
+    # 先建表（create_all 幂等），再启动服务
+    command:
+      - sh
+      - -c
+      - python create_tables.py && python -m uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    networks:
+      - ipnet
+
+  # ─────────────────────────────────────────────
+  # 前端（Nginx 静态站点 + API 反向代理）
+  # ─────────────────────────────────────────────
+  web:
+    build:
+      context: ./frontend
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    container_name: ip-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+    networks:
+      - ipnet
+
+volumes:
+  db_data:
+
+networks:
+  ipnet:
+    driver: bridge

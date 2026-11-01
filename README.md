@@ -280,6 +280,7 @@ HR: 招聘阶段 new → contact → next_round → decision → closed
 | 鉴权 | bcrypt、PyJWT、候选人 Token 哈希、角色隔离 |
 | 可观测 | LangChain callback、JSONL 用量日志、离线汇总脚本 |
 | 测试 | pytest、FastAPI TestClient、SQLite 内存库 |
+| 容器化 | Docker、Docker Compose、多阶段构建 |
 | 部署 | 腾讯云 Lighthouse、Ubuntu、Nginx、systemd、Tailscale Funnel |
 
 ## 数据模型
@@ -391,6 +392,48 @@ erDiagram
 | GET | `/api/health` | 健康检查 | 无 |
 
 完整接口与请求模型见启动后的 Swagger：`http://127.0.0.1:8000/docs`。
+
+## Docker 一键启动
+
+不需要在本机安装 Python / MySQL / Node，只需要 Docker Desktop 或 Docker Engine + Compose。
+
+```bash
+# 1. 准备环境变量（后端启动时读取 DEEPSEEK_API_KEY，缺失会直接报错）
+cp backend/.env.example backend/.env
+# 编辑 backend/.env，填入 DEEPSEEK_API_KEY
+
+# 2. 启动（首次构建约 3–5 分钟，之后改代码只需重建最后一层）
+docker compose up -d --build
+```
+
+启动后：
+
+| 入口 | 地址 |
+| --- | --- |
+| 前端（Nginx） | http://127.0.0.1:8080 |
+| 后端 API | http://127.0.0.1:8000/api/health |
+
+三个服务：
+
+| 服务 | 镜像 | 端口 | 说明 |
+| --- | --- | --- | --- |
+| `db` | `mysql:8.0` | 3306 | 数据持久化在具名卷 `db_data` |
+| `api` | 本地构建 | 8000 | 启动时先跑 `create_tables.py`（`create_all` 幂等），再拉起 uvicorn |
+| `web` | 本地构建 | 8080 → 80 | Nginx 托管前端静态资源，并把 `/api` 反代到 `api:8000` |
+
+```bash
+docker compose ps            # 查看状态
+docker compose logs -f api   # 跟踪后端日志
+docker compose down          # 停止，数据卷保留
+docker compose down -v       # 停止并清空数据库
+```
+
+几个实现要点：
+
+- **容器之间用服务名互相访问**。后端连库写的是 `DB_HOST: db`，Nginx 反代写的是 `proxy_pass http://api:8000`。容器内的 `127.0.0.1` 指向容器自己，不能用。
+- **`depends_on` 配合 `healthcheck`**：等 MySQL 真正能接受连接后后端才启动，避免建表时数据库还没就绪。
+- **前端用多阶段构建**：构建阶段装 Node 与依赖，运行阶段只拷贝 `dist/` 到 Nginx，最终镜像约 74MB。
+- **`.dockerignore` 排除 `.venv`、`.env`、测试文件**：镜像里不含本地环境与密钥。
 
 ## 本地运行
 

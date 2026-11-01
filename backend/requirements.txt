@@ -5,6 +5,10 @@ uvicorn[standard]>=0.30,<1.0
 # Database
 SQLAlchemy>=2.0,<3.0
 PyMySQL>=1.1,<2.0
+# MySQL 8 默认使用 caching_sha2_password 认证；PyMySQL 在非 TLS 连接下
+# 做首次认证需要 RSA 加密，缺这个包会报
+# "cryptography is required for sha256_password or caching_sha2_password"
+cryptography>=42
 
 # Validation / auth / config
 pydantic>=2.8,<3.0

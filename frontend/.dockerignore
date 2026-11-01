@@ -1,0 +1,9 @@
+# 构建上下文排除项：node_modules 有几百 MB，绝不能发进构建上下文
+node_modules/
+dist/
+.vite/
+
+# 编辑器与文档
+*.md
+.vscode/
+.DS_Store
