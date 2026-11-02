@@ -46,3 +46,26 @@ _TEST_ENV = {
 
 for _key, _value in _TEST_ENV.items():
     os.environ.setdefault(_key, _value)
+
+
+import pytest  # noqa: E402  （必须在环境变量注入之后导入）
+
+
+@pytest.fixture(autouse=True)
+def _fake_redis():
+    """每个测试用独立的 fakeredis 实例。
+
+    限流状态现在存在 Redis 里。测试如果连真实 Redis，既需要启动服务、
+    又会互相污染。fakeredis 在进程内模拟 Redis 协议，行为足够一致，
+    而且每个用例一份，天然隔离。
+    """
+    import fakeredis
+
+    from app import rate_limit
+
+    client = fakeredis.FakeRedis(decode_responses=True)
+    rate_limit.set_client(client)
+    try:
+        yield client
+    finally:
+        rate_limit.reset_client()

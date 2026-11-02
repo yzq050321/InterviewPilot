@@ -42,8 +42,7 @@ def ctx(monkeypatch):
     monkeypatch.setattr(main, "generate_question_agent", first)
     monkeypatch.setattr(main, "generate_followup_agent", next_question)
     main.app.dependency_overrides[get_db] = get_test_db
-    with limiter._LOCK:
-        limiter._EVENTS.clear()
+    limiter.reset_state()
     try:
         with TestClient(main.app) as client:
             r = client.post("/api/interviews", json={"candidate_name": "测试甲", "position": "后端工程师"})
@@ -53,8 +52,7 @@ def ctx(monkeypatch):
             yield client, maker, calls, created
     finally:
         main.app.dependency_overrides.clear()
-        with limiter._LOCK:
-            limiter._EVENTS.clear()
+        limiter.reset_state()
         engine.dispose()
 
 

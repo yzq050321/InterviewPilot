@@ -275,6 +275,7 @@ HR: 招聘阶段 new → contact → next_round → decision → closed
 | API | Python、FastAPI、Pydantic、python-multipart |
 | 简历解析 | pypdf（PDF）、python-docx（DOCX） |
 | 数据层 | MySQL、SQLAlchemy 2.x、显式 SQL 迁移 |
+| 限流 | Redis 7、ZSET 滑动窗口（多 worker 共享计数） |
 | LLM | DeepSeek Chat、LangChain、Tool Calling |
 | RAG | Qwen Embedding（DashScope）、Chroma |
 | 鉴权 | bcrypt、PyJWT、候选人 Token 哈希、角色隔离 |
@@ -413,11 +414,12 @@ docker compose up -d --build
 | 前端（Nginx） | http://127.0.0.1:8080 |
 | 后端 API | http://127.0.0.1:8000/api/health |
 
-三个服务：
+四个服务：
 
 | 服务 | 镜像 | 端口 | 说明 |
 | --- | --- | --- | --- |
 | `db` | `mysql:8.0` | 3306 | 数据持久化在具名卷 `db_data` |
+| `redis` | `redis:7-alpine` | 内部 6379 | 限流状态；不建数据卷，计数本就是易失数据 |
 | `api` | 本地构建 | 8000 | 启动时先跑 `create_tables.py`（`create_all` 幂等），再拉起 uvicorn |
 | `web` | 本地构建 | 8080 → 80 | Nginx 托管前端静态资源，并把 `/api` 反代到 `api:8000` |
 
@@ -588,7 +590,7 @@ Nginx
 - 不做自动录用/淘汰，AI 分数只作辅助；报告必须经 HR 人工复核。
 - 没有企业多租户、SSO、审计日志、候选人数据保留/删除策略。
 - 受邀 HR 账号目前共享同一工作区，没有 `owner_user_id` 数据隔离；也没有每账号 AI 配额/邮箱验证/找回密码。不要把它当成完整 SaaS。
-- 限流是单进程内存实现，多进程/多机部署需要 Redis 或 API 网关；Nginx 反代下 `request.client.host` 可能是代理 IP，登录限流需要可信代理配置。
+- 限流状态已迁移到 Redis（ZSET 滑动窗口），多 worker / 多实例共享同一份计数，进程重启不再清零；但 Redis 不可用时是 **fail-open**（放行 + 记日志），生产环境需要配合告警。Nginx 反代下 `request.client.host` 可能是代理 IP，登录限流仍需可信代理配置才能拿到真实来源。
 - 报告生成是同步请求 + 数据库租约，不是消息队列/后台任务系统。
 - 知识库只有一份示例文档，RAG 规模与召回率尚未做系统评测。
 - 用量记录是按单价估算，不是云账单；Embedding/服务器费用未计入。

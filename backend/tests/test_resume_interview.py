@@ -51,15 +51,13 @@ def env(monkeypatch):
         return "请介绍你简历里的 FastAPI 项目。"
 
     monkeypatch.setattr(job_routes, "generate_question_agent", fake_first)
-    with limiter._LOCK:
-        limiter._EVENTS.clear()
+    limiter.reset_state()
     try:
         with TestClient(main.app) as client:
             yield client, LocalSession, captured
     finally:
         main.app.dependency_overrides.clear()
-        with limiter._LOCK:
-            limiter._EVENTS.clear()
+        limiter.reset_state()
         engine.dispose()
 
 

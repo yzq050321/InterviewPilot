@@ -69,8 +69,7 @@ def test_evaluation_refers_to_requirements_not_invented_evidence(monkeypatch):
 
 
 def test_invitation_limiter_and_global_limiter():
-    with limiter._LOCK:
-        limiter._EVENTS.clear()
+    limiter.reset_state()
     for _ in range(5):
         limiter.require_create_capacity(invite_code="fixture-invite-code-1")
     with pytest.raises(HTTPException) as exc:
@@ -80,12 +79,10 @@ def test_invitation_limiter_and_global_limiter():
 
     # 其他邀请码仍可调用，不会被第一个邀请码的额度错误影响。
     limiter.require_create_capacity(invite_code="fixture-invite-code-2")
-    with limiter._LOCK:
-        limiter._EVENTS.clear()
+    limiter.reset_state()
     for _ in range(30):
         limiter.require_create_capacity()
     with pytest.raises(HTTPException) as exc:
         limiter.require_create_capacity()
     assert exc.value.status_code == 429
-    with limiter._LOCK:
-        limiter._EVENTS.clear()
+    limiter.reset_state()

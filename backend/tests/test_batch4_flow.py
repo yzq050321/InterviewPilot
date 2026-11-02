@@ -56,15 +56,13 @@ def env(monkeypatch):
     monkeypatch.setattr(main, "generate_followup_agent", fake_followup)
     monkeypatch.setattr(main, "generate_evaluation", fake_evaluation)
 
-    with limiter._LOCK:
-        limiter._EVENTS.clear()
+    limiter.reset_state()
     try:
         with TestClient(main.app) as client:
             yield client, LocalSession, seen
     finally:
         main.app.dependency_overrides.clear()
-        with limiter._LOCK:
-            limiter._EVENTS.clear()
+        limiter.reset_state()
         engine.dispose()
 
 
