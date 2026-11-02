@@ -70,6 +70,20 @@ services:
       - sh
       - -c
       - python create_tables.py && python -m uvicorn main:app --host 0.0.0.0 --port 8000
+    # 容器 running ≠ 服务可用：进程起来后 uvicorn 还要 import
+    # langchain / chromadb，几秒后才开始监听 8000。
+    # 没有这个健康检查，`up --wait` 会在 nginx 已就绪、后端未监听时就返回，
+    # 于是反向代理拿到 502。
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request, sys; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3); sys.exit(0)"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
     ports:
       - "8000:8000"
     networks:
@@ -87,6 +101,12 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     ports:
       - "8080:80"
     networks:

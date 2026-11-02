@@ -111,11 +111,13 @@ jobs:
       #   8000 -> 直连后端
       - name: 健康检查
         run: |
+          # --wait 现在会等到 api 与 web 的健康检查都通过，
+          # 这里再加重试兜底，避免健康状态切换瞬间的抖动。
           echo "--- 经 Nginx 反代 ---"
-          curl -fsS http://127.0.0.1:8080/api/health
+          curl -fsS --retry 20 --retry-delay 2 --retry-all-errors http://127.0.0.1:8080/api/health
           echo
           echo "--- 直连后端 ---"
-          curl -fsS http://127.0.0.1:8000/api/health
+          curl -fsS --retry 20 --retry-delay 2 --retry-all-errors http://127.0.0.1:8000/api/health
 
       # 失败时把容器日志打出来，否则 Actions 页面只能看到 exit code 1
       - name: 失败时输出容器日志
