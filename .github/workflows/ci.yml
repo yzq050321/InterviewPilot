@@ -78,3 +78,50 @@ jobs:
       # tsc -b && vite build：类型检查 + 打包，两者任一失败即失败
       - name: 构建
         run: npm run build
+
+  # ─────────────────────────────────────────────
+  # 任务三：镜像构建 + 全栈冒烟测试
+  #
+  # 与上面两个任务的区别：上面证明「代码逻辑对」，
+  # 这里证明「别人拿到仓库能真的把它跑起来」。
+  # ─────────────────────────────────────────────
+  docker:
+    name: 镜像构建与全栈冒烟
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      # 后端在 import 阶段就读取 DEEPSEEK_API_KEY，缺了容器会直接退出。
+      # CI 里用 .env.example 的占位值即可，不会发起真实调用。
+      - name: 准备环境变量
+        run: cp backend/.env.example backend/.env
+
+      # --wait 会等到所有服务 healthy 或 running 才返回；
+      # --wait-timeout 给足首次拉取 mysql 镜像 + 构建前端的时间。
+      - name: 构建并启动全栈
+        run: docker compose up -d --build --wait --wait-timeout 300
+
+      - name: 确认服务状态
+        run: docker compose ps
+
+      # 两个入口都打一次：
+      #   8080 -> Nginx 反代 -> api:8000
+      #   8000 -> 直连后端
+      - name: 健康检查
+        run: |
+          echo "--- 经 Nginx 反代 ---"
+          curl -fsS http://127.0.0.1:8080/api/health
+          echo
+          echo "--- 直连后端 ---"
+          curl -fsS http://127.0.0.1:8000/api/health
+
+      # 失败时把容器日志打出来，否则 Actions 页面只能看到 exit code 1
+      - name: 失败时输出容器日志
+        if: failure()
+        run: docker compose logs --tail 60
+
+      - name: 清理
+        if: always()
+        run: docker compose down -v
